@@ -1,34 +1,27 @@
-import java.io.IOException;
-import java.io.File;
+/*
+SCO-0002 commit
+*/
+
 
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData ;
-import org.apache.avro.generic.GenericRecord ;
-
-import org.apache.avro.Schema.Type;
-
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.*;
-
 import org.apache.avro.reflect.ReflectData;
-
-
-import org.apache.hadoop.conf.Configuration;
-
-import org.apache.hadoop.conf.Configured;
-
-import org.apache.hadoop.fs.Path;
-
-import org.apache.hadoop.mapred.*;
-
-import org.apache.hadoop.mapreduce.Job;
-
-import org.apache.hadoop.io.* ;
-//import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-
-//import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-
-import org.apache.hadoop.util.*;
 import org.apache.avro.util.Utf8;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.util.GenericOptionsParser;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+import java.io.File;
+import java.io.IOException;
+
+//import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+//import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 class UFORecord
 {
