@@ -36,7 +36,10 @@ public class TestReadParquet extends Configured
             String inputRecord = value.toString();
             // Process the value, create an output record
             // ...
-            context.write(outKey, new Text(outputRecord));
+            String caseId = inputRecord.split(",")[0];
+            if (Integer.valueOf(caseId) < 3) {
+                context.write(outKey, new Text(outputRecord));
+            }
         }
     }
 
