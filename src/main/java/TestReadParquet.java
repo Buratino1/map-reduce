@@ -1,11 +1,13 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -33,13 +35,27 @@ public class TestReadParquet extends Configured
             NullWritable outKey = NullWritable.get();
             String outputRecord = "";
             // Get the schema and field values of the record
-            String inputRecord = value.toString();
+            // String inputRecord = value.toString();
             // Process the value, create an output record
             // ...
-            String caseId = inputRecord.split(",")[0];
-            if (Integer.valueOf(caseId) < 3) {
+            int field1 = value.getInteger("x", 0);
+
+            System.out.println("field1 = " + field1);
+
+            if (field1 < 3) {
                 context.write(outKey, new Text(outputRecord));
             }
+        }
+    }
+
+    public static class MyRed extends
+            Reducer<LongWritable, Group, NullWritable, Text> {
+        public void reduce(LongWritable key, Group value, Mapper.Context context)
+                throws IOException, InterruptedException {
+            int field1 = value.getInteger("x", 0);
+
+            context.write(key, new IntWritable(100500));
+
         }
     }
 
@@ -54,7 +70,8 @@ public class TestReadParquet extends Configured
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(Text.class);
         job.setMapperClass(MyMap.class);
-        job.setNumReduceTasks(0);
+        job.setReducerClass(MyRed.class);
+        // job.setNumReduceTasks(0);
 
         job.setInputFormatClass(ExampleInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
