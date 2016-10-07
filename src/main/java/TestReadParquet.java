@@ -3,7 +3,6 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -28,31 +27,23 @@ public class TestReadParquet extends Configured
      * Read a Parquet record
      */
     public static class MyMap extends
-            Mapper<LongWritable, Group, NullWritable, Text> {
+            Mapper<LongWritable, Group, LongWritable, Text> {
 
         @Override
         public void map(LongWritable key, Group value, Context context) throws IOException, InterruptedException {
-            NullWritable outKey = NullWritable.get();
-            String outputRecord = "";
-            // Get the schema and field values of the record
-            // String inputRecord = value.toString();
-            // Process the value, create an output record
-            // ...
-            int field1 = value.getInteger("x", 0);
-
-            System.out.println("field1 = " + field1);
-
-            if (field1 < 3) {
-                context.write(outKey, new Text(outputRecord));
-            }
+            LongWritable outKey = key;
+            int field1 = value.getInteger("case_id", 0);
+            String field2 = value.getString("registration_date", 0);
+            String field3 = value.getString("creation_date", 0);
+            context.write(outKey, new Text(field1+";"+field2+";"+field3));
         }
     }
 
     public static class MyRed extends
-            Reducer<LongWritable, Group, NullWritable, Text> {
+            Reducer<LongWritable, Group, LongWritable, Text> {
         public void reduce(LongWritable key, Group value, Mapper.Context context)
                 throws IOException, InterruptedException {
-            int field1 = value.getInteger("x", 0);
+            // int field1 = value.getInteger("x", 0);
 
             context.write(key, new IntWritable(100500));
 
@@ -71,7 +62,7 @@ public class TestReadParquet extends Configured
         job.setOutputValueClass(Text.class);
         job.setMapperClass(MyMap.class);
         job.setReducerClass(MyRed.class);
-        // job.setNumReduceTasks(0);
+        job.setNumReduceTasks(0);
 
         job.setInputFormatClass(ExampleInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
