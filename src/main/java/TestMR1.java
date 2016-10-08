@@ -17,7 +17,7 @@ import parquet.hadoop.example.ExampleInputFormat;
 
 import java.io.IOException;
 
-public class TestReadParquet extends Configured
+public class TestMR1 extends Configured
         implements Tool {
     private static final Log LOG =
             Log.getLog(TestReadParquet.class);
@@ -31,14 +31,9 @@ public class TestReadParquet extends Configured
         @Override
         public void map(LongWritable key, Group value, Context context) throws IOException, InterruptedException {
             LongWritable outKey = key;
-            int field1 = value.getInteger("case_id", 0);
-            String field2 = value.getString("registration_date", 0);
-            String field3 = value.getString("booking_date", 0);
-            if (field2.equals("09/09/2014")) {
-                context.write(outKey, new Text(field1 + ";" + field2 + ";" + field3));
-            } else {
-                context.write(outKey, new Text(field1 + ";" + field2 + ";" + field3));
-            }
+            int field1 = value.getInteger("x", 0);
+            String field2 = value.getString("y", 0);
+            context.write(outKey, new Text(field1 + ";" + field2 ));
         }
     }
 
@@ -46,9 +41,7 @@ public class TestReadParquet extends Configured
             Reducer<LongWritable, Group, LongWritable, Text> {
         public void reduce(LongWritable key, Group value, Mapper.Context context)
                 throws IOException, InterruptedException {
-            String field1 = value.getString(0, 0);
-
-            context.write(key, new Text(field1));
+            context.write(key, new Text("Test"));
 
         }
     }
@@ -58,14 +51,14 @@ public class TestReadParquet extends Configured
         Job job = new Job(getConf());
 
         job.setJarByClass(getClass());
-        job.setJobName(getClass().getName());
+        job.setJobName("TestMR1_job");
         job.setMapOutputKeyClass(LongWritable.class);
         job.setMapOutputValueClass(Text.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(Text.class);
         job.setMapperClass(MyMap.class);
         job.setReducerClass(MyRed.class);
-        // job.setNumReduceTasks(0);
+        job.setNumReduceTasks(0);
 
         job.setInputFormatClass(ExampleInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
@@ -79,7 +72,7 @@ public class TestReadParquet extends Configured
 
     public static void main(String[] args) throws Exception {
         try {
-            int res = ToolRunner.run(new Configuration(), new TestReadParquet(), args);
+            int res = ToolRunner.run(new Configuration(), new TestMR1(), args);
             System.exit(res);
         } catch (Exception e) {
             e.printStackTrace();
