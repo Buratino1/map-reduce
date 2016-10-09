@@ -11,8 +11,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <hadoop.version>2.5.0</hadoop.version>
-        <parquet.version>1.5.0</parquet.version>
-        <avro.version>1.7.6</avro.version>
+        <parquet.version>1.6.0</parquet.version>
+        <avro.version>1.8.1</avro.version>
     </properties>
 
 
@@ -93,6 +93,19 @@
             <extensions>true</extensions>
             <configuration>
                 <remoteOBR>my-repository</remoteOBR>
+            </configuration>
+        </plugin>
+        <plugin>
+            <groupId>org.apache.avro</groupId>
+
+            <artifactId>avro-maven-plugin</artifactId>
+
+            <configuration>
+
+                <!-- Avro string compiled to java.lang.String instead of CharSequence -->
+
+                <stringType>String</stringType>
+
             </configuration>
         </plugin>
     </plugins>

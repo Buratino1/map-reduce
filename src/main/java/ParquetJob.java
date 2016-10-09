@@ -25,6 +25,7 @@ import java.util.List;
  */
 public class ParquetJob extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
+        System.out.println("Avro test started") ;
         int res = ToolRunner.run(new Configuration(), new ParquetJob(), args);
         System.exit(res);
     }
