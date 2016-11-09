@@ -40,6 +40,7 @@ public class TestReadParquet extends Configured
             Reducer<LongWritable, Group, LongWritable, Text> {
         public void reduce(LongWritable key, Group value, Mapper.Context context)
                 throws IOException, InterruptedException {
+            // Test11
             String field1 = value.getString(0, 0);
 
             context.write(key, new Text(field1));
