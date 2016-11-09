@@ -46,77 +46,21 @@
         </dependency>
     </dependencies>
 
-    <distributionManagement>
-        <repository>
-            <id>my-repository</id>
-            <url>scp://cloudera@192.168.1.150/home/cloudera/ganer/sep</url>
-        </repository>
-    </distributionManagement>
-
     <build>
-    <plugins>
-        <plugin>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro-maven-plugin</artifactId>
-            <version>1.7.5</version>
-            <executions>
-                <execution>
-                    <phase>generate-sources</phase>
-                    <goals>
-                        <goal>schema</goal>
-                    </goals>
-                    <configuration>
-                        <sourceDirectory>
-                            ${project.basedir}/src/main/avro/
-                        </sourceDirectory>
-                        <outputDirectory>
-                            ${project.basedir}/src/main/java/
-                        </outputDirectory>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.1</version>
-            <configuration>
-                <source>1.6</source>
-                <target>1.6</target>
-            </configuration>
-        </plugin>
-
-        <plugin>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>maven-bundle-plugin</artifactId>
-            <version>2.3.7</version>
-            <extensions>true</extensions>
-            <configuration>
-                <remoteOBR>my-repository</remoteOBR>
-            </configuration>
-        </plugin>
-        <plugin>
-            <groupId>org.apache.avro</groupId>
-
-            <artifactId>avro-maven-plugin</artifactId>
-
-            <configuration>
-
-                <!-- Avro string compiled to java.lang.String instead of CharSequence -->
-
-                <stringType>String</stringType>
-
-            </configuration>
-        </plugin>
-    </plugins>
-    <extensions>
-        <extension>
-            <groupId>org.apache.maven.wagon</groupId>
-            <artifactId>wagon-ssh</artifactId>
-            <version>2.5</version>
-        </extension>
-    </extensions>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <configuration>
+                    <compilerArgument>-Xlint:unchecked</compilerArgument>
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
-
 
 </project>

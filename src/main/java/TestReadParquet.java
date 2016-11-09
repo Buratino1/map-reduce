@@ -31,14 +31,8 @@ public class TestReadParquet extends Configured
         @Override
         public void map(LongWritable key, Group value, Context context) throws IOException, InterruptedException {
             LongWritable outKey = key;
-            int field1 = value.getInteger("case_id", 0);
-            String field2 = value.getString("registration_date", 0);
-            String field3 = value.getString("booking_date", 0);
-            if (field2.equals("09/09/2014")) {
-                context.write(outKey, new Text(field1 + ";" + field2 + ";" + field3));
-            } else {
-                context.write(outKey, new Text(field1 + ";" + field2 + ";" + field3));
-            }
+            int field1 = value.getInteger("caseid", 0);
+            context.write(outKey, new Text(field1 + ";"));
         }
     }
 
