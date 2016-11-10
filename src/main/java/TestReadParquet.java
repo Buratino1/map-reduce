@@ -41,10 +41,13 @@ public class TestReadParquet extends Configured
             Reducer<LongWritable, Group, LongWritable, Text> {
         public void reduce(LongWritable key, Group value, Mapper.Context context)
                 throws IOException, InterruptedException {
-            // int field1 = value.getInteger("x", 0);
 
-            context.write(key, new IntWritable(100500));
+            String caseId = value.getString("caseId", 0);
+            if (caseId.equals("6624287032")) {
 
+                context.write(key, new IntWritable(100500));
+
+            }
         }
     }
 
