@@ -24,6 +24,7 @@ public class TestReadParquet extends Configured
             Log.getLog(TestReadParquet.class);
 
     /*
+     * DGO test1
      * Read a Parquet record
      */
     public static class MyMap extends
