@@ -49,11 +49,11 @@ public class TestReadParquet extends Configured
     }
 
     public static class MyRed extends
-            Reducer<LongWritable, Group, LongWritable, Text> {
-        public void reduce(LongWritable key, Group value, Mapper.Context context)
+            Reducer<LongWritable, Text, LongWritable, Text> {
+        public void reduce(LongWritable key, Text value, Mapper.Context context)
                 throws IOException, InterruptedException {
 
-            String caseId = value.getString("caseId", 0);
+            String caseId = value.toString() ;
             if (caseId.equals("6624287032")) {
 
                 context.write(key, new Text("test"));
