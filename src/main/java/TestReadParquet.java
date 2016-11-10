@@ -1,8 +1,8 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -31,9 +31,19 @@ public class TestReadParquet extends Configured
 
         @Override
         public void map(LongWritable key, Group value, Context context) throws IOException, InterruptedException {
+            NullWritable outKey = NullWritable.get();
+            String outputRecord = "";
+            // Get the schema and field values of the record
+            String inputRecord = value.toString();
+            // Process the value, create an output record
+            // ...
+            context.write(key, new Text(outputRecord));
+
+        /*
             LongWritable outKey = key;
             String field1 = value.getString("caseId", 0);
             context.write(outKey, new Text(field1+";"));
+        */
         }
     }
 
@@ -45,7 +55,7 @@ public class TestReadParquet extends Configured
             String caseId = value.getString("caseId", 0);
             if (caseId.equals("6624287032")) {
 
-                context.write(key, new IntWritable(100500));
+                context.write(key, new Text("test"));
 
             }
         }
@@ -63,7 +73,7 @@ public class TestReadParquet extends Configured
         job.setOutputValueClass(Text.class);
         job.setMapperClass(MyMap.class);
         job.setReducerClass(MyRed.class);
-        job.setNumReduceTasks(0);
+        // job.setNumReduceTasks(0);
 
         job.setInputFormatClass(ExampleInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
