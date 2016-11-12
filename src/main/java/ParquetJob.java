@@ -19,14 +19,12 @@ import parquet.schema.MessageType;
 import java.util.List;
 
 /**
- * DGO test2
  * Example usage: yarn jar parquet-mr-example-0.0.1-SNAPSHOT.jar \
  * -libjars /opt/cloudera/parcels/CDH/lib/avro/avro-mapred.jar -Dmapreduce.job.reduces=11 \
  * -Ddfs.blocksize=256m -Dparquet.block.size=268435456 /user/bschrameck/authParquet/ /user/bschrameck/parquetOutput/
  */
 public class ParquetJob extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
-        System.out.println("Avro/paquet test started") ;
         int res = ToolRunner.run(new Configuration(), new ParquetJob(), args);
         System.exit(res);
     }
@@ -64,7 +62,6 @@ public class ParquetJob extends Configured implements Tool {
         AvroJob.setMapOutputValueSchema(job, avroSchema);
 
         // Reducer
-        job.setNumReduceTasks(0);
         job.setReducerClass(ParquetReducer.class);
         // Output
         job.setOutputFormatClass(AvroParquetOutputFormat.class);

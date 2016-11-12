@@ -4,6 +4,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import java.io.IOException;
+
 public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void, GenericRecord> {
 
     /**
@@ -16,17 +17,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
     @Override
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
         for (AvroValue<GenericRecord> value : values) {
-            GenericRecord record = value.datum();
-
-            int x = (Integer) record.get("x") ;
-
-            if ( x < 1000) {
-                context.write(null, value.datum());
-            }
-
-            if ( record.get("y").equals("09/09/2014") ) {
-                context.write(null, value.datum());
-            }
+            context.write(null, value.datum());
         }
     }
 }
