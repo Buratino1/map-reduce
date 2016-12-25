@@ -9,9 +9,9 @@ import java.util.Properties;
 
 public class tst {
 
-    private static String USER_NAME = "gigant2006";  // GMail user name (just the part before "@gmail.com")
-    private static String PASSWORD = "gravis2002"; // GMail password
-    private static String RECIPIENT = "ono@inbox.lv";
+    private static String USER_NAME = "login";  // GMail user name (just the part before "@gmail.com")
+    private static String PASSWORD = "pass"; // GMail password
+    private static String RECIPIENT = "mail";
 
     public static void main(String[] args) {
         String from = USER_NAME;
