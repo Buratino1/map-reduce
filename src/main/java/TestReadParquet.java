@@ -54,11 +54,10 @@ public class TestReadParquet extends Configured
                 throws IOException, InterruptedException {
 
             String caseId = value.toString() ;
-            if (caseId.equals("6624287032")) {
-
-                context.write(key, new Text("test"));
-
+            if (caseId.equals("6624287032") ) {
+                context.write(key, "20");
             }
+
         }
     }
 
@@ -74,7 +73,7 @@ public class TestReadParquet extends Configured
         job.setOutputValueClass(Text.class);
         job.setMapperClass(MyMap.class);
         job.setReducerClass(MyRed.class);
-        // job.setNumReduceTasks(0);
+        job.setNumReduceTasks(0);
 
         job.setInputFormatClass(ExampleInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
