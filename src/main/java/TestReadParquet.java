@@ -33,7 +33,7 @@ public class TestReadParquet extends Configured
         @Override
         public void map(LongWritable key, Group value, Context context) throws IOException, InterruptedException {
             NullWritable outKey = NullWritable.get();
-            String outputRecord = value.getString("caseId", 0);;
+            String outputRecord = value.getString("x", 0);;
             // Get the schema and field values of the record
             String inputRecord = value.toString();
             // Process the value, create an output record
