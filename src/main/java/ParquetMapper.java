@@ -26,8 +26,13 @@ public class ParquetMapper extends Mapper<LongWritable, GenericRecord, Text, Avr
      */
     @Override
     protected void map(LongWritable key, GenericRecord value, Context context) throws IOException, InterruptedException {
-        outputKey.set("" + value.get("x") + WRITE_DELIM + value.get("y"));
-        outputValue.datum(value);
-        context.write(outputKey, outputValue);
+        Integer caseIdInt = (Integer) value.get("x");
+        String caseId = caseIdInt.toString() ;
+
+        if (caseId.equals("6624287032") ) {
+            outputKey.set("" + value.get("x") + WRITE_DELIM + value.get("y"));
+            outputValue.datum(value);
+            context.write(outputKey, outputValue);
+        }
     }
 }
