@@ -29,7 +29,7 @@ public class ParquetMapper extends Mapper<LongWritable, GenericRecord, Text, Avr
         Integer caseIdInt = (Integer) value.get("x");
         String caseId = caseIdInt.toString() ;
 
-        if (caseId.equals("6624287032") ) {
+        if (caseId.equals("406844777") ) {
             outputKey.set("" + value.get("x") + WRITE_DELIM + value.get("y"));
             outputValue.datum(value);
             context.write(outputKey, outputValue);
