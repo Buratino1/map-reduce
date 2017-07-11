@@ -12,9 +12,10 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import parquet.Log;
-import parquet.example.data.Group;
-import parquet.hadoop.example.ExampleInputFormat;
+import org.apache.parquet.Log;
+import org.apache.parquet.example.data.Group;
+import org.apache.parquet.hadoop.example.ExampleInputFormat;
+
 
 import java.io.IOException;
 
