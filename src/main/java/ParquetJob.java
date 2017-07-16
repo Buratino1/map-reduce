@@ -18,11 +18,10 @@ import org.apache.parquet.schema.MessageType;
 
 import java.util.List;
 
-/**
- * Example usage: yarn jar parquet-mr-example-0.0.1-SNAPSHOT.jar \
- * -libjars /opt/cloudera/parcels/CDH/lib/avro/avro-mapred.jar -Dmapreduce.job.reduces=11 \
- * -Ddfs.blocksize=256m -Dparquet.block.size=268435456 /user/bschrameck/authParquet/ /user/bschrameck/parquetOutput/
- */
+ // yarn jar target/testmr-1.0-SNAPSHOT.jar ParquetJob -libjars
+ // /usr/hdp/2.6.0.3-8/hadoop/lib/parquet-avro-1.8.1.jar,/usr/hdp/2.6.0.3-8/hadoop/lib/parquet-hadoop-1.8.1.jar,/usr/hdp/2.6.0.3-8/hadoop/lib/parquet-common-1.8.1.jar,/usr/hdp/2.6.0.3-8/hadoop/lib/parquet-column-1.8.1.jar,/usr/hdp/2.6.0.3-8/hadoop/lib/avro-mapred-1.8.1.jar
+ // /ganer/mvdb /ganer/out2
+
 public class ParquetJob extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
         int res = ToolRunner.run(new Configuration(), new ParquetJob(), args);
