@@ -7,6 +7,7 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.parquet.avro.AvroParquetInputFormat;
@@ -35,8 +36,12 @@ public class ParquetJob extends Configured implements Tool {
      */
     // @Override
     public int run(String[] args) throws Exception {
+        Configuration conf = getConf();
+        conf.setBoolean(MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST, true);
+
         Job job = Job.getInstance(getConf());
         job.setJarByClass(ParquetJob.class);
+
 
         // Parquet Schema
         // we assume a single schema for all files
