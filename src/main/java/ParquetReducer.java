@@ -12,7 +12,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
 
         Queue<Integer> queue = new LinkedList<Integer>();
-        List<Integer> rows = new ArrayList<Integer>();
+        List<Integer> rows = new ArrayList<Integer>(1000);
         AvroValue<GenericRecord> rn ;
 
         Integer prevValue = 0;
