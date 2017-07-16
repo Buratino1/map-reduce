@@ -34,7 +34,7 @@ public class ParquetJob extends Configured implements Tool {
      * @return the job return status, 0 for success, 1 for failure
      * @throws Exception
      */
-    @Override
+    // @Override
     public int run(String[] args) throws Exception {
         Job job = Job.getInstance(getConf());
         job.setJarByClass(ParquetJob.class);
