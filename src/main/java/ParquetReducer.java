@@ -12,17 +12,14 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
 
         Queue<Integer> queue = new LinkedList<Integer>();
-        List<Integer> rows = new ArrayList<Integer>(1000);
+        Map<Integer, Integer> rows = new TreeMap<Integer, Integer>();
         AvroValue<GenericRecord> rn ;
-
-        Integer prevValue = 0;
 
         for (AvroValue<GenericRecord> value : values) {
             Integer nId  = (Integer) value.datum().get("id") ;
             Integer nVal = (Integer) value.datum().get("value") ;
             String sType = (String) value.datum().get("type") ;
-            rows.add(nId, nVal) ;
-            rn = value ;
+            rows.put(nId, nVal) ;
         }
 
         for (AvroValue<GenericRecord> value : values) {
