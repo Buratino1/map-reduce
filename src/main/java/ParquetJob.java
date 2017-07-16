@@ -37,6 +37,7 @@ public class ParquetJob extends Configured implements Tool {
     // @Override
     public int run(String[] args) throws Exception {
         Configuration conf = getConf();
+
         conf.setBoolean(MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST, true);
 
         Job job = Job.getInstance(getConf());
