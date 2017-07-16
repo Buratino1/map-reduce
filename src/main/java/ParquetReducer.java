@@ -10,7 +10,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
 
     @Override
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
-/*
+
         Queue<Integer> queue = new LinkedList<Integer>();
         List<Integer> rows = new ArrayList<Integer>();
         AvroValue<GenericRecord> rn ;
@@ -24,7 +24,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
             rows.add(nId, nVal) ;
             rn = value ;
         }
-*/
+
         for (AvroValue<GenericRecord> value : values) {
             context.write(null, value.datum());
         }
