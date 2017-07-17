@@ -73,7 +73,7 @@ public class ParquetJob extends Configured implements Tool {
         AvroParquetOutputFormat.setOutputPath(job, new Path(args[1]));
         AvroParquetOutputFormat.setSchema(job, avroSchema);
         job.setOutputKeyClass(Void.class);
-        job.setOutputValueClass(GenericRecord.class);
+        job.setOutputValueClass(Text.class);
 
         // Execute job and return status
         return job.waitForCompletion(true) ? 0 : 1;
