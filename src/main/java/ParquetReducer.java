@@ -1,29 +1,33 @@
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroValue;
+import org.apache.avro.mapred.Pair;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import java.io.IOException;
 import java.util.*;
 
 public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void, GenericRecord> {
+    private TreeMap<Integer, Pair<String, Integer>> rows = new TreeMap<Integer, Pair<String, Integer>>();
 
     @Override
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
 
-        Queue<Integer> queue = new LinkedList<Integer>();
-        Map<Integer, Integer> rows = new TreeMap<Integer, Integer>();
-        AvroValue<GenericRecord> rn ;
+        // Map<Integer, Integer> rows = new TreeMap<Integer, Integer>();
 
+        GenericRecord record = null;
         for (AvroValue<GenericRecord> value : values) {
             Integer nId  = (Integer) value.datum().get("id") ;
-            Integer nVal = (Integer) value.datum().get("value") ;
-            String sType = (String) value.datum().get("type") ;
-            rows.put(nId, nVal) ;
+            rows.put(nId, new Pair<String, Integer>(value.datum().get("type"), value.datum().get("value") ) ) ;
         }
 
-        for (AvroValue<GenericRecord> value : values) {
-            context.write(null, value.datum());
+        for(Map.Entry<Integer, Pair<String, Integer>> entry : rows.entrySet()) {
+            Integer rowId = entry.getKey();
+            Pair<String, Integer> rowValue = entry.getValue();
+
+            record.put(rowId,rowValue.get(0));
+            context.write(null, record);
         }
     }
 }
