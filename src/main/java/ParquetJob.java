@@ -8,6 +8,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.parquet.avro.AvroParquetInputFormat;
@@ -69,9 +71,13 @@ public class ParquetJob extends Configured implements Tool {
         // Reducer
         job.setReducerClass(ParquetReducer.class);
         // Output
-        job.setOutputFormatClass(AvroParquetOutputFormat.class);
-        AvroParquetOutputFormat.setOutputPath(job, new Path(args[1]));
-        AvroParquetOutputFormat.setSchema(job, avroSchema);
+        // job.setOutputFormatClass(AvroParquetOutputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
+        // AvroParquetOutputFormat.setSchema(job, avroSchema);
+        // AvroParquetOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
         job.setOutputKeyClass(Void.class);
         job.setOutputValueClass(Text.class);
 
