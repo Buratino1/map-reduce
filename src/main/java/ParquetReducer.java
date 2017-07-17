@@ -20,7 +20,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
         for(Map.Entry<Integer, AbstractMap.SimpleEntry<String, Integer>> entry : rows.entrySet()) {
             AbstractMap.SimpleEntry<String, Integer> rowValue = entry.getValue();
 
-            if (rowValue.getKey() == "original") {
+            if (rowValue.getKey().equals("original")) {
                 lastValue = rowValue.getValue() ;
                 adj = "" ;
             } else {
