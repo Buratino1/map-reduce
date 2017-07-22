@@ -6,9 +6,10 @@ import java.io.IOException;
 import java.util.*;
 
 public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void, Text> {
-    private static final byte shif = 2 ;
+    private static final byte shift = 2 ;
 
     private TreeMap<Integer, AbstractMap.SimpleEntry<String, Integer>> rows = new TreeMap<Integer,AbstractMap.SimpleEntry<String, Integer>>();
+    List<Integer> queue = new LinkedList<Integer>();
     private String adj = "";
     private int lastValue = -1;
 
@@ -25,9 +26,13 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
 
             if (rowValue.getKey().equals("original")) {
                 lastValue = rowValue.getValue() ;
+                queue.add(lastValue) ;
                 adj = "" ;
             } else {
                 adj = " " + String.valueOf(lastValue);
+                if (queue.size()- shift >0) {
+                    adj = " " + queue.get(queue.size()-shift).toString() ;
+                }
             }
             Text output = new Text(entry.getKey()+" "+rowValue.getKey() + " " + rowValue.getValue() + adj);
 
