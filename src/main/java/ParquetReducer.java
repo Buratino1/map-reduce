@@ -6,15 +6,18 @@ import java.io.IOException;
 import java.util.*;
 
 public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void, Text> {
+    private static final byte shif = 2 ;
+
     private TreeMap<Integer, AbstractMap.SimpleEntry<String, Integer>> rows = new TreeMap<Integer,AbstractMap.SimpleEntry<String, Integer>>();
     private String adj = "";
-    private Integer lastValue = -1;
+    private int lastValue = -1;
+
 
     @Override
     protected void reduce(Text key, Iterable<AvroValue<GenericRecord>> values, Context context) throws IOException, InterruptedException {
         for (AvroValue<GenericRecord> value : values) {
-            AbstractMap.SimpleEntry<String, Integer> pair = new AbstractMap.SimpleEntry(value.datum().get("type"), value.datum().get("value")) ;
-            rows.put((Integer) value.datum().get("id") , pair) ;
+            rows.put((Integer) value.datum().get("id"),
+                      new AbstractMap.SimpleEntry(value.datum().get("type"), value.datum().get("value"))) ;
         }
 
         for(Map.Entry<Integer, AbstractMap.SimpleEntry<String, Integer>> entry : rows.entrySet()) {
@@ -24,7 +27,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
                 lastValue = rowValue.getValue() ;
                 adj = "" ;
             } else {
-                adj = " " + lastValue.toString();
+                adj = " " + String.valueOf(lastValue);
             }
             Text output = new Text(entry.getKey()+" "+rowValue.getKey() + " " + rowValue.getValue() + adj);
 
