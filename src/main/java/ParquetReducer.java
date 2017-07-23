@@ -22,10 +22,10 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
         }
 
         for(Map.Entry<Integer, AbstractMap.SimpleEntry<String, Integer>> entry : rows.entrySet()) {
-            AbstractMap.SimpleEntry<String, Integer> rowValue = entry.getValue();
+            AbstractMap.SimpleEntry<String, Integer> rowData = entry.getValue();
 
-            if (rowValue.getKey().equals("original")) {
-                lastValue = rowValue.getValue() ;
+            if (rowData.getKey().equals("original")) {
+                lastValue = rowData.getValue() ;
                 queue.add(lastValue) ;
                 adj = "" ;
             } else {
@@ -34,7 +34,7 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
                     adj = adj + " " + queue.get(queue.size()-shift).toString() ;
                 }
             }
-            Text output = new Text(entry.getKey()+" "+rowValue.getKey() + " " + rowValue.getValue() + adj);
+            Text output = new Text(entry.getKey()+" "+rowData.getKey() + " " + rowData.getValue() + adj);
 
             context.write(null, output );
         }
