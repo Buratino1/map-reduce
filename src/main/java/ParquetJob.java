@@ -75,7 +75,7 @@ public class ParquetJob extends Configured implements Tool {
         job.setOutputFormatClass(TextOutputFormat.class);
         // AvroParquetOutputFormat.setSchema(job, avroSchema);
         // AvroParquetOutputFormat.setOutputPath(job, new Path(args[1]));
-        job.setNumReduceTasks(3);
+        job.setNumReduceTasks(7);
 
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
