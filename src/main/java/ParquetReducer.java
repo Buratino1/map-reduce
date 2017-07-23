@@ -29,12 +29,14 @@ public class ParquetReducer extends Reducer<Text, AvroValue<GenericRecord>, Void
                 queue.add(lastValue) ;
                 adj = "" ;
             } else {
-                adj = " " + String.valueOf(lastValue);
+                if (lastValue >0)
+                    adj = " " + String.valueOf(lastValue);
+
                 if (queue.size()- shift >0) {
                     adj = adj + " " + queue.get(queue.size()-shift).toString() ;
                 }
             }
-            Text output = new Text(entry.getKey()+" "+rowData.getKey() + " " + rowData.getValue() + adj);
+            Text output = new Text(key+" "+entry.getKey()+" "+rowData.getKey() + " " + rowData.getValue() + adj);
 
             context.write(null, output );
         }
