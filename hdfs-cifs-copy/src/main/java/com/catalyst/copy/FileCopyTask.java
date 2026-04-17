@@ -7,6 +7,7 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -85,8 +86,9 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
 
         MessageDigest writeDigest = MessageDigest.getInstance("MD5");
 
-        try (FSDataInputStream in = fs.open(src);
-             FileOutputStream out = new FileOutputStream(tmpFile)) {
+        try (FSDataInputStream in = fs.open(src, bufferSize);
+             BufferedOutputStream out = new BufferedOutputStream(
+                     new FileOutputStream(tmpFile), bufferSize)) {
             byte[] buf = new byte[bufferSize];
             int n;
             while ((n = in.read(buf)) > 0) {
@@ -94,7 +96,6 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
                 out.write(buf, 0, n);
             }
             out.flush();
-            out.getFD().sync();
         }
 
         String writeMd5 = toHex(writeDigest.digest());

@@ -15,7 +15,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
     private static final String DEFAULT_DST = "/Catalyst_archive_data/backup_test/{pid}";
     private static final int DEFAULT_THREADS = 35;
     private static final int DEFAULT_RETRIES = 3;
-    private static final int DEFAULT_BUFFER = 131072;
+    private static final int DEFAULT_BUFFER = 1048576;
 
     @Override
     public int run(String[] args) throws Exception {
