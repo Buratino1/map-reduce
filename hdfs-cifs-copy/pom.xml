@@ -21,10 +21,7 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
             <version>${hadoop.version}</version>
-            <!-- compile scope: produces a self-contained fat jar.
-                 Switch to <scope>provided</scope> if the Cloudera repo is
-                 unreachable, then run via "hadoop jar" which adds the
-                 cluster classpath automatically. -->
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
