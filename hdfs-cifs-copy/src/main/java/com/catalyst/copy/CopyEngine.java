@@ -28,15 +28,17 @@ public class CopyEngine {
     private final int threads;
     private final int retries;
     private final int bufferSize;
+    private final boolean checksum;
 
     public CopyEngine(Configuration conf, String srcPath, String dstPath,
-                       int threads, int retries, int bufferSize) {
+                       int threads, int retries, int bufferSize, boolean checksum) {
         this.conf = conf;
         this.srcPath = srcPath;
         this.dstPath = dstPath;
         this.threads = threads;
         this.retries = retries;
         this.bufferSize = bufferSize;
+        this.checksum = checksum;
     }
 
     public CopyResult execute() throws IOException, InterruptedException {
@@ -82,7 +84,8 @@ public class CopyEngine {
                     destFile,
                     file.getLen(),
                     retries,
-                    bufferSize);
+                    bufferSize,
+                    checksum);
             futures.add(pool.submit(task));
         }
 

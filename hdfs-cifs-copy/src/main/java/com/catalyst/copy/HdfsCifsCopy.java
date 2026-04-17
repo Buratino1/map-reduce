@@ -20,20 +20,22 @@ public class HdfsCifsCopy extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
         String pid = null;
-        String src = DEFAULT_SRC;
-        String dst = DEFAULT_DST;
+        String src = null;
+        String dst = null;
         int threads = DEFAULT_THREADS;
         int retries = DEFAULT_RETRIES;
         int buffer = DEFAULT_BUFFER;
+        boolean checksum = true;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "--pid":     pid     = args[++i]; break;
-                case "--src":     src     = args[++i]; break;
-                case "--dst":     dst     = args[++i]; break;
-                case "--threads": threads = Integer.parseInt(args[++i]); break;
-                case "--retries": retries = Integer.parseInt(args[++i]); break;
-                case "--buffer":  buffer  = Integer.parseInt(args[++i]); break;
+                case "--pid":         pid     = args[++i]; break;
+                case "--src":         src     = args[++i]; break;
+                case "--dst":         dst     = args[++i]; break;
+                case "--threads":     threads = Integer.parseInt(args[++i]); break;
+                case "--retries":     retries = Integer.parseInt(args[++i]); break;
+                case "--buffer":      buffer  = Integer.parseInt(args[++i]); break;
+                case "--no-checksum": checksum = false; break;
                 default:
                     System.err.println("Unknown option: " + args[i]);
                     printUsage();
@@ -41,23 +43,28 @@ public class HdfsCifsCopy extends Configured implements Tool {
             }
         }
 
-        if (pid == null) {
-            System.err.println("Error: --pid is required");
+        if (src == null && dst == null && pid == null) {
+            System.err.println("Error: --pid is required when --src/--dst are not specified");
             printUsage();
             return 1;
         }
 
-        src = src.replace("{pid}", pid);
-        dst = dst.replace("{pid}", pid);
+        if (src == null) src = DEFAULT_SRC;
+        if (dst == null) dst = DEFAULT_DST;
 
-        LOG.info("PID      : {}", pid);
+        if (pid != null) {
+            src = src.replace("{pid}", pid);
+            dst = dst.replace("{pid}", pid);
+        }
+
         LOG.info("Source   : {}", src);
         LOG.info("Dest     : {}", dst);
         LOG.info("Threads  : {}", threads);
         LOG.info("Retries  : {}", retries);
         LOG.info("Buffer   : {} bytes", buffer);
+        LOG.info("Checksum : {}", checksum);
 
-        CopyEngine engine = new CopyEngine(getConf(), src, dst, threads, retries, buffer);
+        CopyEngine engine = new CopyEngine(getConf(), src, dst, threads, retries, buffer, checksum);
         CopyEngine.CopyResult result = engine.execute();
 
         LOG.info("Files copied  : {}", result.getFilesCopied());
@@ -75,8 +82,9 @@ public class HdfsCifsCopy extends Configured implements Tool {
     }
 
     private static void printUsage() {
-        System.err.println("Usage: hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --pid <id> "
-                + "[--src <path>] [--dst <path>] [--threads N] [--retries N] [--buffer N]");
+        System.err.println("Usage: hadoop jar hdfs-cifs-copy-1.0.0-fat.jar [--pid <id>]"
+                + " [--src <hdfs-path>] [--dst <local-path>]"
+                + " [--threads N] [--retries N] [--buffer N] [--no-checksum]");
     }
 
     public static void main(String[] args) throws Exception {
