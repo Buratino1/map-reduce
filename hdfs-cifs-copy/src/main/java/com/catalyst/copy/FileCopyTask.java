@@ -38,9 +38,10 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
 
     @Override
     public Result call() {
+        String thread = Thread.currentThread().getName();
         File destFile = new File(localPath);
         if (destFile.exists() && destFile.length() == expectedSize) {
-            LOG.info("[SKIP] size={}KB {}", expectedSize / 1024, hdfsPath);
+            LOG.info("[{}] [SKIP] size={}KB {}", thread, expectedSize / 1024, hdfsPath);
             return new Result(Status.SKIPPED, 0);
         }
 
@@ -50,14 +51,14 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
                 long start = System.currentTimeMillis();
                 copyWithChecksum();
                 long elapsed = (System.currentTimeMillis() - start) / 1000;
-                LOG.info("[OK] attempt={} elapsed={}s size={}KB  {}",
-                        attempt, elapsed, expectedSize / 1024, hdfsPath);
+                LOG.info("[{}] [OK] attempt={} elapsed={}s size={}KB  {}",
+                        thread, attempt, elapsed, expectedSize / 1024, hdfsPath);
                 return new Result(Status.COPIED, expectedSize);
             } catch (Exception e) {
                 if (attempt <= maxRetries) {
                     long backoffMs = (1L << attempt) * 1000;
-                    LOG.warn("[RETRY {}/{}] {}: {}",
-                            attempt, maxRetries, hdfsPath, e.getMessage());
+                    LOG.warn("[{}] [RETRY {}/{}] {}: {}",
+                            thread, attempt, maxRetries, hdfsPath, e.getMessage());
                     try {
                         Thread.sleep(backoffMs);
                     } catch (InterruptedException ie) {
@@ -65,7 +66,7 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
                         break;
                     }
                 } else {
-                    LOG.error("[FAIL] {}: {}", hdfsPath, e.getMessage());
+                    LOG.error("[{}] [FAIL] {}: {}", thread, hdfsPath, e.getMessage());
                     return new Result(Status.FAILED, 0);
                 }
             }
@@ -75,7 +76,8 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
 
     private void copyWithChecksum() throws IOException, NoSuchAlgorithmException {
         Path src = new Path(hdfsPath);
-        FileSystem fs = src.getFileSystem(conf);
+        FileSystem fs = FileSystem.newInstance(src.toUri(), conf);
+        try {
 
         File destFile = new File(localPath);
         File tmpFile = new File(localPath + ".tmp");
@@ -120,6 +122,9 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
         if (!tmpFile.renameTo(destFile)) {
             tmpFile.delete();
             throw new IOException("Rename failed: " + tmpFile + " -> " + destFile);
+        }
+        } finally {
+            fs.close();
         }
     }
 
