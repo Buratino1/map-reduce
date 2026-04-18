@@ -93,7 +93,10 @@ public class HdfsCifsCopy extends Configured implements Tool {
             LOG.info("Files skipped : {}", result.getFilesSkipped());
             LOG.info("Files failed  : {}", result.getFilesFailed());
             LOG.info("Bytes copied  : {} MB", result.getBytesCopied() / (1024L * 1024L));
-            LOG.info("Elapsed       : {} s", result.getElapsedSeconds());
+            long secs = result.getElapsedSeconds();
+            LOG.info("Elapsed       : {} ({} s)",
+                    String.format("%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60),
+                    secs);
             if (result.getElapsedSeconds() > 0) {
                 double throughputMBs = (result.getBytesCopied() / (1024.0 * 1024.0))
                         / result.getElapsedSeconds();
