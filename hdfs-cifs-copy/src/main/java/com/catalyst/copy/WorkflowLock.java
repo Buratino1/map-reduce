@@ -15,8 +15,8 @@ public class WorkflowLock {
     private static final Logger LOG = LoggerFactory.getLogger(WorkflowLock.class);
 
     private static final String CHECK_SQL =
-            "SELECT id, host_id, acquired_at FROM workflow_locks"
-            + " WHERE name = ? AND cid = ? AND workflow = ?";
+            "SELECT id, host_id, workflow, acquired_at FROM workflow_locks"
+            + " WHERE name = ? AND cid = ?";
     private static final String INSERT_SQL =
             "INSERT INTO workflow_locks (name, cid, workflow, host_id, lock_type)"
             + " VALUES (?, ?, ?, ?, ?)";
@@ -53,11 +53,11 @@ public class WorkflowLock {
                 try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
                     ps.setString(1, name);
                     ps.setString(2, pid);
-                    ps.setString(3, workflow);
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
                             LOG.info("Waiting for lock [{}/{}]: name={} cid={} workflow={} held by host={} since={}",
-                                    attempt, MAX_RETRIES, name, pid, workflow,
+                                    attempt, MAX_RETRIES, name, pid,
+                                    rs.getString("workflow"),
                                     rs.getString("host_id"), rs.getTimestamp("acquired_at"));
                             Thread.sleep(RETRY_INTERVAL_MS);
                             continue;
