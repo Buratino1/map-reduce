@@ -49,8 +49,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
             }
         }
 
-        if (src == null && dst == null && pid == null) {
-            System.err.println("Error: --pid is required when --src/--dst are not specified");
+        if (pid == null) {
+            System.err.println("Error: --pid is required");
             printUsage();
             return 1;
         }
@@ -58,16 +58,12 @@ public class HdfsCifsCopy extends Configured implements Tool {
         if (src == null) src = DEFAULT_SRC;
         if (dst == null) dst = DEFAULT_DST;
 
-        if (pid != null) {
-            src = src.replace("{pid}", pid);
-            dst = dst.replace("{pid}", pid);
-        }
+        src = src.replace("{pid}", pid);
+        dst = dst.replace("{pid}", pid);
 
-        boolean useLock = dbUrl != null && pid != null;
-        if (dbUrl != null && pid == null) {
-            LOG.warn("DB connection specified but --pid is missing; skipping lock");
-        }
+        boolean useLock = dbUrl != null;
 
+        LOG.info("PID      : {}", pid);
         LOG.info("Source   : {}", src);
         LOG.info("Dest     : {}", dst);
         LOG.info("Threads  : {}", threads);
@@ -112,7 +108,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
     }
 
     private static void printUsage() {
-        System.err.println("Usage: hadoop jar hdfs-cifs-copy-1.0.0-fat.jar [--pid <id>]"
+        System.err.println("Usage: hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --pid <id>"
                 + " [--src <hdfs-path>] [--dst <local-path>]"
                 + " [--threads N] [--retries N] [--buffer N] [--no-checksum]"
                 + " [--db-url <jdbc-url>] [--db-user <user>] [--db-pass <pass>]");

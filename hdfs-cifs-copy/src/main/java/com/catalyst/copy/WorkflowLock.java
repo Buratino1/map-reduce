@@ -18,11 +18,13 @@ public class WorkflowLock {
     private static final String LOCK_TYPE = "X";
 
     private static final String CHECK_SQL =
-            "SELECT id, host_id, acquired_at FROM workflow_locks WHERE name = ? AND workflow = ?";
+            "SELECT id, host_id, acquired_at FROM workflow_locks"
+            + " WHERE name = ? AND cid = ? AND workflow = ?";
     private static final String INSERT_SQL =
-            "INSERT INTO workflow_locks (name, cid, workflow, host_id, lock_type) VALUES (?, ?, ?, ?, ?)";
+            "INSERT INTO workflow_locks (name, cid, workflow, host_id, lock_type)"
+            + " VALUES (?, ?, ?, ?, ?)";
     private static final String DELETE_SQL =
-            "DELETE FROM workflow_locks WHERE name = ? AND workflow = ?";
+            "DELETE FROM workflow_locks WHERE name = ? AND cid = ? AND workflow = ?";
 
     private final String dbUrl;
     private final String dbUser;
@@ -42,7 +44,8 @@ public class WorkflowLock {
         try (Connection conn = getConnection()) {
             try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
                 ps.setString(1, pid);
-                ps.setString(2, WORKFLOW);
+                ps.setString(2, pid);
+                ps.setString(3, WORKFLOW);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         LOG.error("PID {} is already locked by host={} since={}",
@@ -73,7 +76,8 @@ public class WorkflowLock {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(DELETE_SQL)) {
             ps.setString(1, pid);
-            ps.setString(2, WORKFLOW);
+            ps.setString(2, pid);
+            ps.setString(3, WORKFLOW);
             int rows = ps.executeUpdate();
             if (rows > 0) {
                 LOG.info("Lock released for PID {}", pid);
