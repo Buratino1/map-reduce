@@ -16,12 +16,19 @@ public class WorkflowLock {
 
     private static final String CHECK_SQL =
             "SELECT id, host_id, workflow, acquired_at FROM workflow_locks"
-            + " WHERE name = ? AND cid = ?";
+            + " WHERE name = ? AND cid = ? AND lock_type = 'X'";
+    private static final String COUNT_EXCLUSIVE_SQL =
+            "SELECT COUNT(*) AS cnt FROM workflow_locks"
+            + " WHERE name = ? AND cid = ? AND lock_type = 'X'";
     private static final String INSERT_SQL =
             "INSERT INTO workflow_locks (name, cid, workflow, host_id, lock_type)"
             + " VALUES (?, ?, ?, ?, ?)";
     private static final String DELETE_SQL =
             "DELETE FROM workflow_locks WHERE name = ? AND cid = ? AND workflow = ?";
+
+    private static final int MAX_RETRIES = 2000;
+    private static final long RETRY_INTERVAL_MS = 2 * 60 * 1000L;
+    private static final long VERIFY_DELAY_MS = 20 * 1000L;
 
     private final String dbUrl;
     private final String dbUser;
@@ -44,37 +51,32 @@ public class WorkflowLock {
         this.hostId = resolveHost();
     }
 
-    private static final int MAX_RETRIES = 2000;
-    private static final long RETRY_INTERVAL_MS = 2 * 60 * 1000L;
-
     public boolean acquire() {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try (Connection conn = getConnection()) {
-                try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
-                    ps.setString(1, name);
-                    ps.setString(2, pid);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            LOG.info("Waiting for lock [{}/{}]: name={} cid={} workflow={} held by host={} since={}",
-                                    attempt, MAX_RETRIES, name, pid,
-                                    rs.getString("workflow"),
-                                    rs.getString("host_id"), rs.getTimestamp("acquired_at"));
-                            Thread.sleep(RETRY_INTERVAL_MS);
-                            continue;
-                        }
-                    }
+            try {
+                if (hasExclusiveLock()) {
+                    LOG.info("Waiting for lock [{}/{}]: name={} cid={}",
+                            attempt, MAX_RETRIES, name, pid);
+                    Thread.sleep(RETRY_INTERVAL_MS);
+                    continue;
                 }
 
-                try (PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
-                    ps.setString(1, name);
-                    ps.setString(2, pid);
-                    ps.setString(3, workflow);
-                    ps.setString(4, hostId);
-                    ps.setString(5, lockType);
-                    ps.executeUpdate();
+                insertLock();
+                LOG.info("Lock inserted: name={} cid={} workflow={} host={}, verifying in 20s...",
+                        name, pid, workflow, hostId);
+
+                Thread.sleep(VERIFY_DELAY_MS);
+
+                int exclusiveCount = countExclusiveLocks();
+                if (exclusiveCount > 1) {
+                    LOG.warn("Race detected: {} exclusive locks found for name={} cid={}, releasing ours and retrying",
+                            exclusiveCount, name, pid);
+                    deleteLock();
+                    Thread.sleep(RETRY_INTERVAL_MS);
+                    continue;
                 }
 
-                LOG.info("Lock acquired: name={} cid={} workflow={} host={}",
+                LOG.info("Lock verified and acquired: name={} cid={} workflow={} host={}",
                         name, pid, workflow, hostId);
                 return true;
             } catch (SQLException e) {
@@ -96,20 +98,62 @@ public class WorkflowLock {
     }
 
     public void release() {
+        try {
+            deleteLock();
+            LOG.info("Lock released: name={} cid={} workflow={}", name, pid, workflow);
+        } catch (SQLException e) {
+            LOG.error("Failed to release lock for PID {}: {}", pid, e.getMessage());
+        }
+    }
+
+    private boolean hasExclusiveLock() throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
+            ps.setString(1, name);
+            ps.setString(2, pid);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    LOG.info("Exclusive lock held: name={} cid={} workflow={} host={} since={}",
+                            name, pid, rs.getString("workflow"),
+                            rs.getString("host_id"), rs.getTimestamp("acquired_at"));
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private int countExclusiveLocks() throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(COUNT_EXCLUSIVE_SQL)) {
+            ps.setString(1, name);
+            ps.setString(2, pid);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt("cnt");
+            }
+        }
+    }
+
+    private void insertLock() throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
+            ps.setString(1, name);
+            ps.setString(2, pid);
+            ps.setString(3, workflow);
+            ps.setString(4, hostId);
+            ps.setString(5, lockType);
+            ps.executeUpdate();
+        }
+    }
+
+    private void deleteLock() throws SQLException {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(DELETE_SQL)) {
             ps.setString(1, name);
             ps.setString(2, pid);
             ps.setString(3, workflow);
-            int rows = ps.executeUpdate();
-            if (rows > 0) {
-                LOG.info("Lock released: name={} cid={} workflow={}", name, pid, workflow);
-            } else {
-                LOG.warn("No lock found to release: name={} cid={} workflow={}",
-                        name, pid, workflow);
-            }
-        } catch (SQLException e) {
-            LOG.error("Failed to release lock for PID {}: {}", pid, e.getMessage());
+            ps.executeUpdate();
         }
     }
 
