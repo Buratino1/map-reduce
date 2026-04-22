@@ -80,7 +80,10 @@ public class HdfsCifsCopy extends Configured implements Tool {
 
         WorkflowLock lock = null;
         if (useLock) {
-            lock = new WorkflowLock(dbUrl, dbUser, dbPass, pid);
+            String lockName     = props.getProperty("lock.name", "hdfs-backup");
+            String lockWorkflow = props.getProperty("lock.workflow", "hdfs-cifs-copy");
+            String lockType     = props.getProperty("lock.type", "X");
+            lock = new WorkflowLock(dbUrl, dbUser, dbPass, lockName, pid, lockWorkflow, lockType);
             if (!lock.acquire()) {
                 LOG.error("Cannot proceed — PID {} is locked by another process", pid);
                 return 2;

@@ -14,9 +14,6 @@ public class WorkflowLock {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkflowLock.class);
 
-    private static final String WORKFLOW = "hdfs-cifs-copy";
-    private static final String LOCK_TYPE = "X";
-
     private static final String CHECK_SQL =
             "SELECT id, host_id, acquired_at FROM workflow_locks"
             + " WHERE name = ? AND cid = ? AND workflow = ?";
@@ -29,42 +26,51 @@ public class WorkflowLock {
     private final String dbUrl;
     private final String dbUser;
     private final String dbPass;
+    private final String name;
     private final String pid;
+    private final String workflow;
+    private final String lockType;
     private final String hostId;
 
-    public WorkflowLock(String dbUrl, String dbUser, String dbPass, String pid) {
+    public WorkflowLock(String dbUrl, String dbUser, String dbPass,
+                         String name, String pid, String workflow, String lockType) {
         this.dbUrl = dbUrl;
         this.dbUser = dbUser;
         this.dbPass = dbPass;
+        this.name = name;
         this.pid = pid;
+        this.workflow = workflow;
+        this.lockType = lockType;
         this.hostId = resolveHost();
     }
 
     public boolean acquire() {
         try (Connection conn = getConnection()) {
             try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
-                ps.setString(1, pid);
+                ps.setString(1, name);
                 ps.setString(2, pid);
-                ps.setString(3, WORKFLOW);
+                ps.setString(3, workflow);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        LOG.error("PID {} is already locked by host={} since={}",
-                                pid, rs.getString("host_id"), rs.getTimestamp("acquired_at"));
+                        LOG.error("PID {} is already locked: name={} workflow={} host={} since={}",
+                                pid, name, workflow,
+                                rs.getString("host_id"), rs.getTimestamp("acquired_at"));
                         return false;
                     }
                 }
             }
 
             try (PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
-                ps.setString(1, pid);
+                ps.setString(1, name);
                 ps.setString(2, pid);
-                ps.setString(3, WORKFLOW);
+                ps.setString(3, workflow);
                 ps.setString(4, hostId);
-                ps.setString(5, LOCK_TYPE);
+                ps.setString(5, lockType);
                 ps.executeUpdate();
             }
 
-            LOG.info("Lock acquired for PID {} on host {}", pid, hostId);
+            LOG.info("Lock acquired: name={} cid={} workflow={} host={}",
+                    name, pid, workflow, hostId);
             return true;
         } catch (SQLException e) {
             LOG.error("Failed to acquire lock for PID {}: {}", pid, e.getMessage());
@@ -75,14 +81,15 @@ public class WorkflowLock {
     public void release() {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(DELETE_SQL)) {
-            ps.setString(1, pid);
+            ps.setString(1, name);
             ps.setString(2, pid);
-            ps.setString(3, WORKFLOW);
+            ps.setString(3, workflow);
             int rows = ps.executeUpdate();
             if (rows > 0) {
-                LOG.info("Lock released for PID {}", pid);
+                LOG.info("Lock released: name={} cid={} workflow={}", name, pid, workflow);
             } else {
-                LOG.warn("No lock found to release for PID {}", pid);
+                LOG.warn("No lock found to release: name={} cid={} workflow={}",
+                        name, pid, workflow);
             }
         } catch (SQLException e) {
             LOG.error("Failed to release lock for PID {}: {}", pid, e.getMessage());
