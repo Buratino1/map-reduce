@@ -7,6 +7,10 @@ import org.apache.hadoop.util.ToolRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 public class HdfsCifsCopy extends Configured implements Tool {
 
     private static final Logger LOG = LoggerFactory.getLogger(HdfsCifsCopy.class);
@@ -19,6 +23,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
+        Properties props = loadProperties();
+
         String pid = null;
         String src = null;
         String dst = null;
@@ -26,9 +32,9 @@ public class HdfsCifsCopy extends Configured implements Tool {
         int retries = DEFAULT_RETRIES;
         int buffer = DEFAULT_BUFFER;
         boolean checksum = true;
-        String dbUrl = null;
-        String dbUser = null;
-        String dbPass = null;
+        String dbUrl = props.getProperty("db.url");
+        String dbUser = props.getProperty("db.user");
+        String dbPass = props.getProperty("db.pass");
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -105,6 +111,19 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 lock.release();
             }
         }
+    }
+
+    private static Properties loadProperties() {
+        Properties props = new Properties();
+        try (InputStream in = HdfsCifsCopy.class.getClassLoader()
+                .getResourceAsStream("application.properties")) {
+            if (in != null) {
+                props.load(in);
+            }
+        } catch (IOException e) {
+            LOG.warn("Could not load application.properties: {}", e.getMessage());
+        }
+        return props;
     }
 
     private static void printUsage() {
