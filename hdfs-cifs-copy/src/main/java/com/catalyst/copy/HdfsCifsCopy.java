@@ -35,19 +35,21 @@ public class HdfsCifsCopy extends Configured implements Tool {
         String dbUrl = props.getProperty("db.url");
         String dbUser = props.getProperty("db.user");
         String dbPass = props.getProperty("db.pass");
+        String lockName = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "--pid":         pid     = args[++i]; break;
-                case "--src":         src     = args[++i]; break;
-                case "--dst":         dst     = args[++i]; break;
-                case "--threads":     threads = Integer.parseInt(args[++i]); break;
-                case "--retries":     retries = Integer.parseInt(args[++i]); break;
-                case "--buffer":      buffer  = Integer.parseInt(args[++i]); break;
+                case "--pid":         pid      = args[++i]; break;
+                case "--src":         src      = args[++i]; break;
+                case "--dst":         dst      = args[++i]; break;
+                case "--threads":     threads  = Integer.parseInt(args[++i]); break;
+                case "--retries":     retries  = Integer.parseInt(args[++i]); break;
+                case "--buffer":      buffer   = Integer.parseInt(args[++i]); break;
                 case "--no-checksum": checksum = false; break;
-                case "--db-url":      dbUrl   = args[++i]; break;
-                case "--db-user":     dbUser  = args[++i]; break;
-                case "--db-pass":     dbPass  = args[++i]; break;
+                case "--db-url":      dbUrl    = args[++i]; break;
+                case "--db-user":     dbUser   = args[++i]; break;
+                case "--db-pass":     dbPass   = args[++i]; break;
+                case "--lock-name":   lockName = args[++i]; break;
                 default:
                     System.err.println("Unknown option: " + args[i]);
                     printUsage();
@@ -80,9 +82,15 @@ public class HdfsCifsCopy extends Configured implements Tool {
 
         WorkflowLock lock = null;
         if (useLock) {
-            String lockName     = props.getProperty("lock.name", "hdfs-backup");
+            if (lockName == null) lockName = props.getProperty("lock.name");
+            if (lockName == null) {
+                System.err.println("Error: --lock-name is required (e.g. CFF1, CFF2)");
+                printUsage();
+                return 1;
+            }
             String lockWorkflow = props.getProperty("lock.workflow", "hdfs-cifs-copy");
             String lockType     = props.getProperty("lock.type", "X");
+            LOG.info("Lock     : name={} cid={} workflow={}", lockName, pid, lockWorkflow);
             lock = new WorkflowLock(dbUrl, dbUser, dbPass, lockName, pid, lockWorkflow, lockType);
             if (!lock.acquire()) {
                 LOG.error("Cannot proceed — PID {} is locked by another process", pid);
@@ -133,6 +141,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         System.err.println("Usage: hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --pid <id>"
                 + " [--src <hdfs-path>] [--dst <local-path>]"
                 + " [--threads N] [--retries N] [--buffer N] [--no-checksum]"
+                + " [--lock-name <CFF1|CFF2>]"
                 + " [--db-url <jdbc-url>] [--db-user <user>] [--db-pass <pass>]");
     }
 
