@@ -158,7 +158,11 @@ public class WorkflowLock {
     }
 
     private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(dbUrl, dbUser, dbPass);
+        String url = dbUrl;
+        if (url != null && !url.contains("useSSL")) {
+            url += url.contains("?") ? "&useSSL=false" : "?useSSL=false";
+        }
+        return DriverManager.getConnection(url, dbUser, dbPass);
     }
 
     private static String resolveHost() {

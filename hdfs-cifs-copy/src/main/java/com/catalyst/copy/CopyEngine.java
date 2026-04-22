@@ -3,7 +3,9 @@ package com.catalyst.copy;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +52,11 @@ public class CopyEngine {
             return new CopyResult(0, 0, 0, 0, 0);
         }
 
-        List<FileStatus> files = new ArrayList<>();
-        listFilesRecursive(fs, src, files);
+        List<LocatedFileStatus> files = new ArrayList<>();
+        RemoteIterator<LocatedFileStatus> it = fs.listFiles(src, true);
+        while (it.hasNext()) {
+            files.add(it.next());
+        }
         LOG.info("Found {} files to copy", files.size());
 
         if (files.isEmpty()) {
@@ -73,7 +78,7 @@ public class CopyEngine {
         });
 
         List<Future<FileCopyTask.Result>> futures = new ArrayList<>();
-        for (FileStatus file : files) {
+        for (LocatedFileStatus file : files) {
             String filePath = file.getPath().toUri().getPath();
             String relative = filePath.substring(srcRootPath.length());
             String destFile = dstPath + relative;
@@ -121,18 +126,6 @@ public class CopyEngine {
         }
 
         return new CopyResult(copied, skipped, failed, bytesCopied, elapsed);
-    }
-
-    private void listFilesRecursive(FileSystem fs, Path path,
-                                     List<FileStatus> result) throws IOException {
-        FileStatus[] statuses = fs.listStatus(path);
-        for (FileStatus status : statuses) {
-            if (status.isDirectory()) {
-                listFilesRecursive(fs, status.getPath(), result);
-            } else {
-                result.add(status);
-            }
-        }
     }
 
     public static class CopyResult {
