@@ -44,38 +44,55 @@ public class WorkflowLock {
         this.hostId = resolveHost();
     }
 
+    private static final int MAX_RETRIES = 2000;
+    private static final long RETRY_INTERVAL_MS = 2 * 60 * 1000L;
+
     public boolean acquire() {
-        try (Connection conn = getConnection()) {
-            try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
-                ps.setString(1, name);
-                ps.setString(2, pid);
-                ps.setString(3, workflow);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        LOG.error("PID {} is already locked: name={} workflow={} host={} since={}",
-                                pid, name, workflow,
-                                rs.getString("host_id"), rs.getTimestamp("acquired_at"));
-                        return false;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try (Connection conn = getConnection()) {
+                try (PreparedStatement ps = conn.prepareStatement(CHECK_SQL)) {
+                    ps.setString(1, name);
+                    ps.setString(2, pid);
+                    ps.setString(3, workflow);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            LOG.info("Waiting for lock [{}/{}]: name={} cid={} workflow={} held by host={} since={}",
+                                    attempt, MAX_RETRIES, name, pid, workflow,
+                                    rs.getString("host_id"), rs.getTimestamp("acquired_at"));
+                            Thread.sleep(RETRY_INTERVAL_MS);
+                            continue;
+                        }
                     }
                 }
-            }
 
-            try (PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
-                ps.setString(1, name);
-                ps.setString(2, pid);
-                ps.setString(3, workflow);
-                ps.setString(4, hostId);
-                ps.setString(5, lockType);
-                ps.executeUpdate();
-            }
+                try (PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
+                    ps.setString(1, name);
+                    ps.setString(2, pid);
+                    ps.setString(3, workflow);
+                    ps.setString(4, hostId);
+                    ps.setString(5, lockType);
+                    ps.executeUpdate();
+                }
 
-            LOG.info("Lock acquired: name={} cid={} workflow={} host={}",
-                    name, pid, workflow, hostId);
-            return true;
-        } catch (SQLException e) {
-            LOG.error("Failed to acquire lock for PID {}: {}", pid, e.getMessage());
-            return false;
+                LOG.info("Lock acquired: name={} cid={} workflow={} host={}",
+                        name, pid, workflow, hostId);
+                return true;
+            } catch (SQLException e) {
+                LOG.error("DB error on lock attempt {}/{} for PID {}: {}",
+                        attempt, MAX_RETRIES, pid, e.getMessage());
+                try {
+                    Thread.sleep(RETRY_INTERVAL_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
+        LOG.error("Failed to acquire lock after {} attempts for PID {}", MAX_RETRIES, pid);
+        return false;
     }
 
     public void release() {
