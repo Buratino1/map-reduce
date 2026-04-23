@@ -1,0 +1,25 @@
+[
+  {
+    "pid": "4050",
+    "lockName": "CFF1",
+    "threads": 200,
+    "src": "/user/catalyst/v2.systems.prod/4050/db_mv",
+    "dst": "/Catalyst_archive_data/backup_test/4050"
+  },
+  {
+    "pid": "2020",
+    "lockName": "CFF2",
+    "threads": 400,
+    "src": "/user/catalyst/cff2.prod/2020",
+    "dst": "/Catalyst_archive_data/backup_test/2020",
+    "checksum": false
+  },
+  {
+    "pid": "2071",
+    "lockName": "CFF2",
+    "threads": 400,
+    "src": "/user/catalyst/cff2.prod/2071",
+    "dst": "/Catalyst_archive_data/backup_test/2071",
+    "checksum": false
+  }
+]

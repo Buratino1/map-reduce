@@ -51,6 +51,38 @@ public class WorkflowLock {
         this.hostId = resolveHost();
     }
 
+    public boolean tryAcquire() {
+        try {
+            if (hasExclusiveLock()) {
+                return false;
+            }
+
+            insertLock();
+            LOG.info("Lock inserted: name={} cid={} workflow={} host={}, verifying in 20s...",
+                    name, pid, workflow, hostId);
+
+            Thread.sleep(VERIFY_DELAY_MS);
+
+            int exclusiveCount = countExclusiveLocks();
+            if (exclusiveCount > 1) {
+                LOG.warn("Race detected: {} exclusive locks for name={} cid={}, releasing ours",
+                        exclusiveCount, name, pid);
+                deleteLock();
+                return false;
+            }
+
+            LOG.info("Lock verified and acquired: name={} cid={} workflow={} host={}",
+                    name, pid, workflow, hostId);
+            return true;
+        } catch (SQLException e) {
+            LOG.error("DB error on tryAcquire for PID {}: {}", pid, e.getMessage());
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     public boolean acquire() {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
