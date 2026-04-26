@@ -224,7 +224,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
         LOG.info("Files copied  : {}", result.getFilesCopied());
         LOG.info("Files skipped : {}", result.getFilesSkipped());
         LOG.info("Files failed  : {}", result.getFilesFailed());
-        LOG.info("Bytes copied  : {} MB", result.getBytesCopied() / (1024L * 1024L));
+        LOG.info("Bytes copied  : {} MB",
+                String.format("%.2f", result.getBytesCopied() / (1024.0 * 1024.0)));
         long secs = result.getElapsedSeconds();
         LOG.info("Elapsed       : {} ({} s)",
                 String.format("%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60),
