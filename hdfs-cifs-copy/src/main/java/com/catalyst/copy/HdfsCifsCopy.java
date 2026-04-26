@@ -224,8 +224,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         LOG.info("Files copied  : {}", result.getFilesCopied());
         LOG.info("Files skipped : {}", result.getFilesSkipped());
         LOG.info("Files failed  : {}", result.getFilesFailed());
-        LOG.info("Bytes copied  : {} MB",
-                String.format("%.2f", result.getBytesCopied() / (1024.0 * 1024.0)));
+        LOG.info("Bytes copied  : {}", formatBytes(result.getBytesCopied()));
         long secs = result.getElapsedSeconds();
         LOG.info("Elapsed       : {} ({} s)",
                 String.format("%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60),
@@ -237,6 +236,20 @@ public class HdfsCifsCopy extends Configured implements Tool {
         }
 
         return result.getFilesFailed() > 0 ? 1 : 0;
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024L) {
+            return bytes + " B";
+        } else if (bytes < 1024L * 1024) {
+            return String.format("%,.2f KB", bytes / 1024.0);
+        } else if (bytes < 1024L * 1024 * 1024) {
+            return String.format("%,.2f MB", bytes / (1024.0 * 1024));
+        } else if (bytes < 1024L * 1024 * 1024 * 1024) {
+            return String.format("%,.2f GB", bytes / (1024.0 * 1024 * 1024));
+        } else {
+            return String.format("%,.2f TB", bytes / (1024.0 * 1024 * 1024 * 1024));
+        }
     }
 
     private static Properties loadProperties() {
