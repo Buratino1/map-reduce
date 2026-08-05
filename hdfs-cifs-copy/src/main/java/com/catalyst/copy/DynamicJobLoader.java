@@ -23,7 +23,7 @@ public class DynamicJobLoader {
             + "  ON p.productionId = c.productionId AND c.name = 'cffv2' "
             + "WHERE p.available = 1";
 
-    private static final String DST_ROOT = "/Catalyst_archive_data/backup_test";
+    private static final String DST_ROOT = "/mnt/hadoop-backup/catalyst_hdfs_backup";
 
     private final String dbUrl;
     private final String dbUser;
@@ -66,7 +66,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF2",
                 "/user/catalyst/cff2.prod/" + pid,
-                DST_ROOT + "/" + pid,
+                DST_ROOT + "/CFF2/" + pid,
                 400, false);
     }
 
@@ -74,7 +74,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/db_mv",
-                DST_ROOT + "/" + pid,
+                DST_ROOT + "/CFF1/" + pid,
                 200, true);
     }
 
@@ -82,7 +82,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/clients",
-                DST_ROOT + "/" + pid + "/clients",
+                DST_ROOT + "/clients/" + pid,
                 100, true);
     }
 
@@ -90,7 +90,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/impala.prod/" + pid + "/ext",
-                DST_ROOT + "/" + pid + "/ext",
+                DST_ROOT + "/ext/" + pid,
                 200, false);
     }
 
