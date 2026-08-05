@@ -1,7 +1,6 @@
 package com.catalyst.copy;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -9,6 +8,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +31,11 @@ public class CopyEngine {
     private final int retries;
     private final int bufferSize;
     private final boolean checksum;
+    private final boolean restore;
 
     public CopyEngine(Configuration conf, String srcPath, String dstPath,
-                       int threads, int retries, int bufferSize, boolean checksum) {
+                       int threads, int retries, int bufferSize, boolean checksum,
+                       boolean restore) {
         this.conf = conf;
         this.srcPath = srcPath;
         this.dstPath = dstPath;
@@ -41,29 +43,16 @@ public class CopyEngine {
         this.retries = retries;
         this.bufferSize = bufferSize;
         this.checksum = checksum;
+        this.restore = restore;
     }
 
     public CopyResult execute() throws IOException, InterruptedException {
-        Path src = new Path(srcPath);
-        FileSystem fs = src.getFileSystem(conf);
-
-        if (!fs.exists(src)) {
-            LOG.error("Source path does not exist: {}", srcPath);
-            return new CopyResult(0, 0, 0, 0, 0);
-        }
-
-        List<LocatedFileStatus> files = new ArrayList<>();
-        RemoteIterator<LocatedFileStatus> it = fs.listFiles(src, true);
-        while (it.hasNext()) {
-            files.add(it.next());
-        }
-        LOG.info("Found {} files to copy", files.size());
+        List<FileEntry> files = restore ? listLocalFiles() : listHdfsFiles();
+        LOG.info("Found {} files to copy ({} mode)", files.size(), restore ? "restore" : "backup");
 
         if (files.isEmpty()) {
             return new CopyResult(0, 0, 0, 0, 0);
         }
-
-        String srcRootPath = src.toUri().getPath();
 
         long startTime = System.currentTimeMillis();
 
@@ -78,19 +67,20 @@ public class CopyEngine {
         });
 
         List<Future<FileCopyTask.Result>> futures = new ArrayList<>();
-        for (LocatedFileStatus file : files) {
-            String filePath = file.getPath().toUri().getPath();
-            String relative = filePath.substring(srcRootPath.length());
-            String destFile = dstPath + relative;
+        for (FileEntry file : files) {
+            String hdfsSide;
+            String localSide;
+            if (restore) {
+                hdfsSide  = file.destPath;
+                localSide = file.srcPath;
+            } else {
+                hdfsSide  = file.srcPath;
+                localSide = file.destPath;
+            }
 
             FileCopyTask task = new FileCopyTask(
-                    conf,
-                    file.getPath().toString(),
-                    destFile,
-                    file.getLen(),
-                    retries,
-                    bufferSize,
-                    checksum);
+                    conf, hdfsSide, localSide, file.size,
+                    retries, bufferSize, checksum, restore);
             futures.add(pool.submit(task));
         }
 
@@ -126,6 +116,64 @@ public class CopyEngine {
         }
 
         return new CopyResult(copied, skipped, failed, bytesCopied, elapsed);
+    }
+
+    private List<FileEntry> listHdfsFiles() throws IOException {
+        List<FileEntry> result = new ArrayList<>();
+        Path src = new Path(srcPath);
+        FileSystem fs = src.getFileSystem(conf);
+
+        if (!fs.exists(src)) {
+            LOG.error("Source HDFS path does not exist: {}", srcPath);
+            return result;
+        }
+
+        String srcRoot = src.toUri().getPath();
+        RemoteIterator<LocatedFileStatus> it = fs.listFiles(src, true);
+        while (it.hasNext()) {
+            LocatedFileStatus f = it.next();
+            String filePath = f.getPath().toUri().getPath();
+            String relative = filePath.substring(srcRoot.length());
+            result.add(new FileEntry(f.getPath().toString(), dstPath + relative, f.getLen()));
+        }
+        return result;
+    }
+
+    private List<FileEntry> listLocalFiles() {
+        List<FileEntry> result = new ArrayList<>();
+        File srcDir = new File(srcPath);
+        if (!srcDir.exists()) {
+            LOG.error("Source local path does not exist: {}", srcPath);
+            return result;
+        }
+        walkLocal(srcDir, result);
+        return result;
+    }
+
+    private void walkLocal(File dir, List<FileEntry> result) {
+        File[] entries = dir.listFiles();
+        if (entries == null) return;
+        for (File f : entries) {
+            if (f.isDirectory()) {
+                walkLocal(f, result);
+            } else {
+                String abs = f.getAbsolutePath();
+                String relative = abs.substring(srcPath.length());
+                result.add(new FileEntry(abs, dstPath + relative, f.length()));
+            }
+        }
+    }
+
+    private static class FileEntry {
+        final String srcPath;
+        final String destPath;
+        final long size;
+
+        FileEntry(String srcPath, String destPath, long size) {
+            this.srcPath = srcPath;
+            this.destPath = destPath;
+            this.size = size;
+        }
     }
 
     public static class CopyResult {

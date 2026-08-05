@@ -2,16 +2,20 @@ package com.catalyst.copy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Callable;
@@ -27,10 +31,11 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
     private final int maxRetries;
     private final int bufferSize;
     private final boolean checksum;
+    private final boolean restore;
 
     public FileCopyTask(Configuration conf, String hdfsPath, String localPath,
                          long expectedSize, int maxRetries, int bufferSize,
-                         boolean checksum) {
+                         boolean checksum, boolean restore) {
         this.conf = conf;
         this.hdfsPath = hdfsPath;
         this.localPath = localPath;
@@ -38,15 +43,21 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
         this.maxRetries = maxRetries;
         this.bufferSize = bufferSize;
         this.checksum = checksum;
+        this.restore = restore;
     }
 
     @Override
     public Result call() {
         String thread = Thread.currentThread().getName();
-        File destFile = new File(localPath);
-        if (destFile.exists() && destFile.length() == expectedSize) {
-            LOG.info("[{}] [SKIP] size={}KB {}", thread, expectedSize / 1024, hdfsPath);
-            return new Result(Status.SKIPPED, 0);
+        String label = restore ? localPath + " -> " + hdfsPath : hdfsPath;
+
+        try {
+            if (destinationExistsWithSize()) {
+                LOG.info("[{}] [SKIP] size={}KB {}", thread, expectedSize / 1024, label);
+                return new Result(Status.SKIPPED, 0);
+            }
+        } catch (IOException e) {
+            LOG.warn("[{}] [SKIP-CHECK-FAILED] {}: {}", thread, label, e.getMessage());
         }
 
         int totalAttempts = maxRetries + 1;
@@ -60,14 +71,14 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
                 }
                 long elapsed = (System.currentTimeMillis() - start) / 1000;
                 LOG.info("[{}] [OK] attempt={} elapsed={}s size={}KB  {}",
-                        thread, attempt, elapsed, expectedSize / 1024, hdfsPath);
+                        thread, attempt, elapsed, expectedSize / 1024, label);
                 return new Result(Status.COPIED, expectedSize);
             } catch (Exception e) {
                 cleanupTmp();
                 if (attempt <= maxRetries) {
                     long backoffMs = (1L << attempt) * 1000;
                     LOG.warn("[{}] [RETRY {}/{}] {}: {}",
-                            thread, attempt, maxRetries, hdfsPath, e.getMessage());
+                            thread, attempt, maxRetries, label, e.getMessage());
                     try {
                         Thread.sleep(backoffMs);
                     } catch (InterruptedException ie) {
@@ -75,7 +86,7 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
                         break;
                     }
                 } else {
-                    LOG.error("[{}] [FAIL] {}: {}", thread, hdfsPath, e.getMessage());
+                    LOG.error("[{}] [FAIL] {}: {}", thread, label, e.getMessage());
                     return new Result(Status.FAILED, 0);
                 }
             }
@@ -83,85 +94,192 @@ public class FileCopyTask implements Callable<FileCopyTask.Result> {
         return new Result(Status.FAILED, 0);
     }
 
-    private void copyDirect() throws IOException {
-        Path src = new Path(hdfsPath);
-        FileSystem fs = FileSystem.newInstance(src.toUri(), conf);
-        try {
+    private boolean destinationExistsWithSize() throws IOException {
+        if (restore) {
+            Path dst = new Path(hdfsPath);
+            FileSystem fs = FileSystem.newInstance(dst.toUri(), conf);
+            try {
+                return fs.exists(dst) && fs.getFileStatus(dst).getLen() == expectedSize;
+            } finally {
+                fs.close();
+            }
+        } else {
             File destFile = new File(localPath);
-            destFile.getParentFile().mkdirs();
+            return destFile.exists() && destFile.length() == expectedSize;
+        }
+    }
 
-            try (FSDataInputStream in = fs.open(src, bufferSize);
-                 BufferedOutputStream out = new BufferedOutputStream(
-                         new FileOutputStream(destFile), bufferSize)) {
-                byte[] buf = new byte[bufferSize];
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    out.write(buf, 0, n);
+    private void copyDirect() throws IOException {
+        FileSystem fs = null;
+        try {
+            InputStream in;
+            OutputStream out;
+            if (restore) {
+                Path dst = new Path(hdfsPath);
+                fs = FileSystem.newInstance(dst.toUri(), conf);
+                if (dst.getParent() != null) {
+                    fs.mkdirs(dst.getParent());
                 }
-                out.flush();
+                in = new BufferedInputStream(new FileInputStream(localPath), bufferSize);
+                out = fs.create(dst, true, bufferSize);
+            } else {
+                Path src = new Path(hdfsPath);
+                fs = FileSystem.newInstance(src.toUri(), conf);
+                File destFile = new File(localPath);
+                if (destFile.getParentFile() != null) {
+                    destFile.getParentFile().mkdirs();
+                }
+                in = fs.open(src, bufferSize);
+                out = new BufferedOutputStream(new FileOutputStream(destFile), bufferSize);
+            }
+
+            try {
+                pipe(in, out);
+            } finally {
+                try { in.close(); } catch (IOException ignore) {}
+                out.close();
             }
         } finally {
-            fs.close();
+            if (fs != null) fs.close();
         }
     }
 
     private void copyWithChecksum() throws IOException, NoSuchAlgorithmException {
-        Path src = new Path(hdfsPath);
-        FileSystem fs = FileSystem.newInstance(src.toUri(), conf);
+        FileSystem fs = null;
+        MessageDigest writeDigest = MessageDigest.getInstance("MD5");
+        String tmpLocalPath = localPath + ".tmp";
+        String tmpHdfsPath = hdfsPath + ".tmp";
+
         try {
-            File destFile = new File(localPath);
-            File tmpFile = new File(localPath + ".tmp");
-            destFile.getParentFile().mkdirs();
-
-            MessageDigest writeDigest = MessageDigest.getInstance("MD5");
-
-            try (FSDataInputStream in = fs.open(src, bufferSize);
-                 BufferedOutputStream out = new BufferedOutputStream(
-                         new FileOutputStream(tmpFile), bufferSize)) {
-                byte[] buf = new byte[bufferSize];
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    writeDigest.update(buf, 0, n);
-                    out.write(buf, 0, n);
+            InputStream in;
+            OutputStream out;
+            if (restore) {
+                Path tmpDst = new Path(tmpHdfsPath);
+                fs = FileSystem.newInstance(tmpDst.toUri(), conf);
+                if (tmpDst.getParent() != null) {
+                    fs.mkdirs(tmpDst.getParent());
                 }
-                out.flush();
+                in = new BufferedInputStream(new FileInputStream(localPath), bufferSize);
+                out = fs.create(tmpDst, true, bufferSize);
+            } else {
+                Path src = new Path(hdfsPath);
+                fs = FileSystem.newInstance(src.toUri(), conf);
+                File tmpFile = new File(tmpLocalPath);
+                if (tmpFile.getParentFile() != null) {
+                    tmpFile.getParentFile().mkdirs();
+                }
+                in = fs.open(src, bufferSize);
+                out = new BufferedOutputStream(new FileOutputStream(tmpFile), bufferSize);
+            }
+
+            try {
+                pipeWithDigest(in, out, writeDigest);
+            } finally {
+                try { in.close(); } catch (IOException ignore) {}
+                out.close();
             }
 
             String writeMd5 = toHex(writeDigest.digest());
 
             MessageDigest verifyDigest = MessageDigest.getInstance("MD5");
-            try (FileInputStream in = new FileInputStream(tmpFile)) {
-                byte[] buf = new byte[bufferSize];
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    verifyDigest.update(buf, 0, n);
-                }
+            InputStream verifyIn;
+            if (restore) {
+                Path tmpDst = new Path(tmpHdfsPath);
+                verifyIn = fs.open(tmpDst, bufferSize);
+            } else {
+                verifyIn = new FileInputStream(tmpLocalPath);
+            }
+            try {
+                digest(verifyIn, verifyDigest);
+            } finally {
+                verifyIn.close();
             }
 
             String verifyMd5 = toHex(verifyDigest.digest());
-
             if (!writeMd5.equals(verifyMd5)) {
-                tmpFile.delete();
+                cleanupTmpInternal(fs);
                 throw new IOException("MD5 mismatch after write: expected=" + writeMd5
                         + " actual=" + verifyMd5);
             }
 
-            if (destFile.exists()) {
-                destFile.delete();
-            }
-            if (!tmpFile.renameTo(destFile)) {
-                tmpFile.delete();
-                throw new IOException("Rename failed: " + tmpFile + " -> " + destFile);
+            if (restore) {
+                Path tmpDst = new Path(tmpHdfsPath);
+                Path finalDst = new Path(hdfsPath);
+                if (fs.exists(finalDst)) {
+                    fs.delete(finalDst, false);
+                }
+                if (!fs.rename(tmpDst, finalDst)) {
+                    fs.delete(tmpDst, false);
+                    throw new IOException("HDFS rename failed: " + tmpDst + " -> " + finalDst);
+                }
+            } else {
+                File tmpFile = new File(tmpLocalPath);
+                File destFile = new File(localPath);
+                if (destFile.exists()) {
+                    destFile.delete();
+                }
+                if (!tmpFile.renameTo(destFile)) {
+                    tmpFile.delete();
+                    throw new IOException("Rename failed: " + tmpFile + " -> " + destFile);
+                }
             }
         } finally {
-            fs.close();
+            if (fs != null) fs.close();
+        }
+    }
+
+    private void pipe(InputStream in, OutputStream out) throws IOException {
+        byte[] buf = new byte[bufferSize];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            out.write(buf, 0, n);
+        }
+        out.flush();
+    }
+
+    private void pipeWithDigest(InputStream in, OutputStream out, MessageDigest md)
+            throws IOException {
+        byte[] buf = new byte[bufferSize];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            md.update(buf, 0, n);
+            out.write(buf, 0, n);
+        }
+        out.flush();
+    }
+
+    private void digest(InputStream in, MessageDigest md) throws IOException {
+        byte[] buf = new byte[bufferSize];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            md.update(buf, 0, n);
         }
     }
 
     private void cleanupTmp() {
-        File tmpFile = new File(localPath + ".tmp");
-        if (tmpFile.exists()) {
-            tmpFile.delete();
+        if (restore) {
+            try {
+                Path tmpDst = new Path(hdfsPath + ".tmp");
+                FileSystem fs = FileSystem.newInstance(tmpDst.toUri(), conf);
+                try {
+                    if (fs.exists(tmpDst)) fs.delete(tmpDst, false);
+                } finally {
+                    fs.close();
+                }
+            } catch (IOException ignore) {}
+        } else {
+            File tmpFile = new File(localPath + ".tmp");
+            if (tmpFile.exists()) tmpFile.delete();
+        }
+    }
+
+    private void cleanupTmpInternal(FileSystem fs) throws IOException {
+        if (restore) {
+            Path tmpDst = new Path(hdfsPath + ".tmp");
+            if (fs.exists(tmpDst)) fs.delete(tmpDst, false);
+        } else {
+            File tmpFile = new File(localPath + ".tmp");
+            if (tmpFile.exists()) tmpFile.delete();
         }
     }
 

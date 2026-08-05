@@ -16,8 +16,12 @@ import java.io.FileInputStream;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 public class HdfsCifsCopy extends Configured implements Tool {
 
@@ -29,6 +33,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
     private static final int DEFAULT_RETRIES = 3;
     private static final int DEFAULT_BUFFER = 1048576;
     private static final long JOBS_RETRY_INTERVAL_MS = 2 * 60 * 1000L;
+    private static final String RESTORE_PREFIX = "/restored";
 
     @Override
     public int run(String[] args) throws Exception {
@@ -47,6 +52,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
         String lockName = null;
         String jobsFile = null;
         boolean dynamic = false;
+        boolean restore = false;
+        Set<String> onlyPids = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -63,6 +70,10 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 case "--lock-name":   lockName = args[++i]; break;
                 case "--jobs":        jobsFile = args[++i]; break;
                 case "--dynamic":     dynamic  = true; break;
+                case "--restore":     restore  = true; break;
+                case "--only-pid":
+                    onlyPids = new HashSet<>(Arrays.asList(args[++i].split(",")));
+                    break;
                 default:
                     System.err.println("Unknown option: " + args[i]);
                     printUsage();
@@ -70,34 +81,43 @@ public class HdfsCifsCopy extends Configured implements Tool {
             }
         }
 
+        LOG.info("Mode     : {}", restore ? "RESTORE (local -> HDFS)" : "BACKUP (HDFS -> local)");
+        if (onlyPids != null) {
+            LOG.info("Only PIDs: {}", onlyPids);
+        }
+
         if (dynamic) {
-            return runDynamicJobs(dbUrl, dbUser, dbPass, props);
+            return runDynamicJobs(dbUrl, dbUser, dbPass, props, restore, onlyPids);
         }
 
         if (jobsFile != null) {
-            return runMultiJob(jobsFile, dbUrl, dbUser, dbPass, props);
+            return runMultiJob(jobsFile, dbUrl, dbUser, dbPass, props, restore, onlyPids);
         }
 
         return runSingleJob(pid, src, dst, threads, retries, buffer, checksum,
-                dbUrl, dbUser, dbPass, lockName, props);
+                dbUrl, dbUser, dbPass, lockName, props, restore);
     }
 
     private int runDynamicJobs(String dbUrl, String dbUser, String dbPass,
-                                Properties props) throws Exception {
+                                Properties props, boolean restore, Set<String> onlyPids)
+            throws Exception {
         if (dbUrl == null) {
             System.err.println("Error: DB connection required for --dynamic mode");
             return 1;
         }
-        LOG.info("Loading backup jobs dynamically from DB...");
+        LOG.info("Loading jobs dynamically from DB...");
         DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass);
         List<BackupJob> jobs = loader.load();
-        return processJobs(jobs, dbUrl, dbUser, dbPass, props);
+        jobs = filterByPid(jobs, onlyPids);
+        if (restore) jobs = transformForRestore(jobs);
+        return processJobs(jobs, dbUrl, dbUser, dbPass, props, restore);
     }
 
     private int runSingleJob(String pid, String src, String dst,
                               int threads, int retries, int buffer, boolean checksum,
                               String dbUrl, String dbUser, String dbPass,
-                              String lockName, Properties props) throws Exception {
+                              String lockName, Properties props, boolean restore)
+            throws Exception {
         if (pid == null) {
             System.err.println("Error: --pid is required");
             printUsage();
@@ -110,11 +130,18 @@ public class HdfsCifsCopy extends Configured implements Tool {
         src = src.replace("{pid}", pid);
         dst = dst.replace("{pid}", pid);
 
+        String actualSrc = src;
+        String actualDst = dst;
+        if (restore) {
+            actualSrc = dst;
+            actualDst = RESTORE_PREFIX + src;
+        }
+
         boolean useLock = dbUrl != null;
 
         LOG.info("PID      : {}", pid);
-        LOG.info("Source   : {}", src);
-        LOG.info("Dest     : {}", dst);
+        LOG.info("Source   : {}", actualSrc);
+        LOG.info("Dest     : {}", actualDst);
         LOG.info("Threads  : {}", threads);
         LOG.info("Retries  : {}", retries);
         LOG.info("Buffer   : {} bytes", buffer);
@@ -140,7 +167,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         }
 
         try {
-            return executeBackup(src, dst, threads, retries, buffer, checksum);
+            return executeCopy(actualSrc, actualDst, threads, retries, buffer, checksum, restore);
         } finally {
             if (lock != null) {
                 lock.release();
@@ -149,7 +176,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
     }
 
     private int runMultiJob(String jobsFile, String dbUrl, String dbUser,
-                             String dbPass, Properties props) throws Exception {
+                             String dbPass, Properties props, boolean restore,
+                             Set<String> onlyPids) throws Exception {
         if (dbUrl == null) {
             System.err.println("Error: DB connection required for --jobs mode (configure in application.properties)");
             return 1;
@@ -162,12 +190,38 @@ public class HdfsCifsCopy extends Configured implements Tool {
             jobs = new Gson().fromJson(reader, listType);
         }
 
-        LOG.info("Loaded {} backup jobs from {}", jobs.size(), jobsFile);
-        return processJobs(jobs, dbUrl, dbUser, dbPass, props);
+        LOG.info("Loaded {} jobs from {}", jobs.size(), jobsFile);
+        jobs = filterByPid(jobs, onlyPids);
+        if (restore) jobs = transformForRestore(jobs);
+        return processJobs(jobs, dbUrl, dbUser, dbPass, props, restore);
+    }
+
+    private List<BackupJob> filterByPid(List<BackupJob> jobs, Set<String> onlyPids) {
+        if (onlyPids == null || onlyPids.isEmpty()) return jobs;
+        List<BackupJob> filtered = new ArrayList<>();
+        for (BackupJob j : jobs) {
+            if (onlyPids.contains(j.getPid())) filtered.add(j);
+        }
+        LOG.info("Filtered {} jobs down to {} for PIDs={}",
+                jobs.size(), filtered.size(), onlyPids);
+        return filtered;
+    }
+
+    private List<BackupJob> transformForRestore(List<BackupJob> jobs) {
+        List<BackupJob> restored = new ArrayList<>();
+        for (BackupJob j : jobs) {
+            String newSrc = j.getDst();
+            String newDst = RESTORE_PREFIX + j.getSrc();
+            restored.add(new BackupJob(
+                    j.getPid(), j.getLockName(),
+                    newSrc, newDst,
+                    j.getThreads(), j.isChecksum()));
+        }
+        return restored;
     }
 
     private int processJobs(List<BackupJob> jobs, String dbUrl, String dbUser,
-                             String dbPass, Properties props) throws Exception {
+                             String dbPass, Properties props, boolean restore) throws Exception {
         for (int i = 0; i < jobs.size(); i++) {
             LOG.info("  Job {}: {}", i + 1, jobs.get(i));
         }
@@ -182,7 +236,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
         while (!pending.isEmpty()) {
             List<BackupJob> stillPending = new ArrayList<>();
 
-            for (BackupJob job : pending) {
+            for (Iterator<BackupJob> it = pending.iterator(); it.hasNext(); ) {
+                BackupJob job = it.next();
                 LOG.info("--- Trying job: pid={} lockName={} src={} ---",
                         job.getPid(), job.getLockName(), job.getSrc());
 
@@ -197,10 +252,10 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 }
 
                 try {
-                    int rc = executeBackup(
+                    int rc = executeCopy(
                             job.getSrc(), job.getDst(),
                             job.getThreads(), job.getRetries(),
-                            job.getBuffer(), job.isChecksum());
+                            job.getBuffer(), job.isChecksum(), restore);
                     if (rc == 0) {
                         totalCompleted++;
                         LOG.info("--- Job completed: pid={} src={} ---",
@@ -236,15 +291,16 @@ public class HdfsCifsCopy extends Configured implements Tool {
         return failed.isEmpty() ? 0 : 1;
     }
 
-    private int executeBackup(String src, String dst, int threads, int retries,
-                               int buffer, boolean checksum)
+    private int executeCopy(String src, String dst, int threads, int retries,
+                             int buffer, boolean checksum, boolean restore)
             throws IOException, InterruptedException {
         LOG.info("Source   : {}", src);
         LOG.info("Dest     : {}", dst);
         LOG.info("Threads  : {}", threads);
         LOG.info("Checksum : {}", checksum);
 
-        CopyEngine engine = new CopyEngine(getConf(), src, dst, threads, retries, buffer, checksum);
+        CopyEngine engine = new CopyEngine(getConf(), src, dst, threads, retries,
+                buffer, checksum, restore);
         CopyEngine.CopyResult result = engine.execute();
 
         LOG.info("Files copied  : {}", result.getFilesCopied());
@@ -296,9 +352,15 @@ public class HdfsCifsCopy extends Configured implements Tool {
         System.err.println("  Single job:  hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --pid <id>"
                 + " [--src <hdfs-path>] [--dst <local-path>]"
                 + " [--threads N] [--retries N] [--buffer N] [--no-checksum]"
-                + " [--lock-name <CFF1|CFF2>]");
-        System.err.println("  Multi job:   hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --jobs <file.json>");
-        System.err.println("  Dynamic:     hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --dynamic");
+                + " [--lock-name <CFF1|CFF2>] [--restore]");
+        System.err.println("  Multi job:   hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --jobs <file.json>"
+                + " [--restore] [--only-pid <id1,id2,...>]");
+        System.err.println("  Dynamic:     hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --dynamic"
+                + " [--restore] [--only-pid <id1,id2,...>]");
+        System.err.println();
+        System.err.println("  --restore   reverses copy direction: reads from local dst,");
+        System.err.println("              writes to HDFS at /restored + original src path");
+        System.err.println("  --only-pid  process only listed production IDs (comma-separated)");
     }
 
     public static void main(String[] args) throws Exception {
