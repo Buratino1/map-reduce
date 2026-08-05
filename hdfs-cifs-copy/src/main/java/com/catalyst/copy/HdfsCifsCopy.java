@@ -141,7 +141,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
             actualDst = RESTORE_PREFIX + src;
         }
 
-        boolean useLock = dbUrl != null;
+        boolean useLock = dbUrl != null && !restore;
 
         LOG.info("PID      : {}", pid);
         LOG.info("Source   : {}", actualSrc);
@@ -245,14 +245,17 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 LOG.info("--- Trying job: pid={} lockName={} src={} ---",
                         job.getPid(), job.getLockName(), job.getSrc());
 
-                WorkflowLock lock = new WorkflowLock(
-                        dbUrl, dbUser, dbPass,
-                        job.getLockName(), job.getPid(), lockWorkflow, lockType);
+                WorkflowLock lock = null;
+                if (!restore) {
+                    lock = new WorkflowLock(
+                            dbUrl, dbUser, dbPass,
+                            job.getLockName(), job.getPid(), lockWorkflow, lockType);
 
-                if (!lock.tryAcquire()) {
-                    LOG.info("PID {} is locked, skipping for now", job.getPid());
-                    stillPending.add(job);
-                    continue;
+                    if (!lock.tryAcquire()) {
+                        LOG.info("PID {} is locked, skipping for now", job.getPid());
+                        stillPending.add(job);
+                        continue;
+                    }
                 }
 
                 try {
@@ -273,7 +276,9 @@ public class HdfsCifsCopy extends Configured implements Tool {
                     failed.add(job);
                     LOG.error("--- Job failed: pid={}: {} ---", job.getPid(), e.getMessage());
                 } finally {
-                    lock.release();
+                    if (lock != null) {
+                        lock.release();
+                    }
                 }
             }
 
