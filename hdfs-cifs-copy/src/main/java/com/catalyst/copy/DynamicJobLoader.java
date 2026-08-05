@@ -47,12 +47,14 @@ public class DynamicJobLoader {
                 String pid = rs.getString("productionId");
                 String type = rs.getString("type");
                 if ("cffv2".equals(type)) {
-                    jobs.add(cffv2Job(pid));
+                    jobs.add(cffv2MainJob(pid));
                     cffv2Count++;
                 } else {
-                    jobs.addAll(cffv1Jobs(pid));
+                    jobs.add(cffv1MainJob(pid));
                     cffv1Count++;
                 }
+                jobs.add(clientsJob(pid));
+                jobs.add(extJob(pid));
             }
         }
         LOG.info("Loaded {} jobs from DB: {} cffv1 systems, {} cffv2 systems",
@@ -60,7 +62,7 @@ public class DynamicJobLoader {
         return jobs;
     }
 
-    private BackupJob cffv2Job(String pid) {
+    private BackupJob cffv2MainJob(String pid) {
         return new BackupJob(
                 pid, "CFF2",
                 "/user/catalyst/cff2.prod/" + pid,
@@ -68,24 +70,28 @@ public class DynamicJobLoader {
                 400, false);
     }
 
-    private List<BackupJob> cffv1Jobs(String pid) {
-        List<BackupJob> list = new ArrayList<>();
-        list.add(new BackupJob(
+    private BackupJob cffv1MainJob(String pid) {
+        return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/db_mv",
                 DST_ROOT + "/" + pid,
-                200, true));
-        list.add(new BackupJob(
+                200, true);
+    }
+
+    private BackupJob clientsJob(String pid) {
+        return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/clients",
                 DST_ROOT + "/" + pid + "/clients",
-                100, true));
-        list.add(new BackupJob(
+                100, true);
+    }
+
+    private BackupJob extJob(String pid) {
+        return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/impala.prod/" + pid + "/ext",
                 DST_ROOT + "/" + pid + "/ext",
-                200, false));
-        return list;
+                200, false);
     }
 
     private Connection getConnection() throws SQLException {
