@@ -72,7 +72,11 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 case "--dynamic":     dynamic  = true; break;
                 case "--restore":     restore  = true; break;
                 case "--only-pid":
-                    onlyPids = new HashSet<>(Arrays.asList(args[++i].split(",")));
+                    if (onlyPids == null) onlyPids = new HashSet<>();
+                    for (String p : args[++i].split(",")) {
+                        p = p.trim();
+                        if (!p.isEmpty()) onlyPids.add(p);
+                    }
                     break;
                 default:
                     System.err.println("Unknown option: " + args[i]);
@@ -360,7 +364,9 @@ public class HdfsCifsCopy extends Configured implements Tool {
         System.err.println();
         System.err.println("  --restore   reverses copy direction: reads from local dst,");
         System.err.println("              writes to HDFS at /restored + original src path");
-        System.err.println("  --only-pid  process only listed production IDs (comma-separated)");
+        System.err.println("  --only-pid  process only listed production IDs;");
+        System.err.println("              accepts comma-separated (--only-pid 7001,2020) or");
+        System.err.println("              repeated (--only-pid 7001 --only-pid 2020)");
     }
 
     public static void main(String[] args) throws Exception {
