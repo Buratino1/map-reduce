@@ -10,6 +10,18 @@ public class BackupJob {
     private int buffer = 1048576;
     private boolean checksum = true;
 
+    public BackupJob() {}
+
+    public BackupJob(String pid, String lockName, String src, String dst,
+                      int threads, boolean checksum) {
+        this.pid = pid;
+        this.lockName = lockName;
+        this.src = src;
+        this.dst = dst;
+        this.threads = threads;
+        this.checksum = checksum;
+    }
+
     public String getPid()       { return pid; }
     public String getLockName()  { return lockName; }
     public String getSrc()       { return src; }
@@ -24,3 +36,4 @@ public class BackupJob {
         return "pid=" + pid + " lockName=" + lockName + " src=" + src + " dst=" + dst;
     }
 }
+

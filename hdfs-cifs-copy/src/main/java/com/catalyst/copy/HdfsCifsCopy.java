@@ -46,6 +46,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         String dbPass = props.getProperty("db.pass");
         String lockName = null;
         String jobsFile = null;
+        boolean dynamic = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -61,11 +62,16 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 case "--db-pass":     dbPass   = args[++i]; break;
                 case "--lock-name":   lockName = args[++i]; break;
                 case "--jobs":        jobsFile = args[++i]; break;
+                case "--dynamic":     dynamic  = true; break;
                 default:
                     System.err.println("Unknown option: " + args[i]);
                     printUsage();
                     return 1;
             }
+        }
+
+        if (dynamic) {
+            return runDynamicJobs(dbUrl, dbUser, dbPass, props);
         }
 
         if (jobsFile != null) {
@@ -74,6 +80,18 @@ public class HdfsCifsCopy extends Configured implements Tool {
 
         return runSingleJob(pid, src, dst, threads, retries, buffer, checksum,
                 dbUrl, dbUser, dbPass, lockName, props);
+    }
+
+    private int runDynamicJobs(String dbUrl, String dbUser, String dbPass,
+                                Properties props) throws Exception {
+        if (dbUrl == null) {
+            System.err.println("Error: DB connection required for --dynamic mode");
+            return 1;
+        }
+        LOG.info("Loading backup jobs dynamically from DB...");
+        DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass);
+        List<BackupJob> jobs = loader.load();
+        return processJobs(jobs, dbUrl, dbUser, dbPass, props);
     }
 
     private int runSingleJob(String pid, String src, String dst,
@@ -145,6 +163,11 @@ public class HdfsCifsCopy extends Configured implements Tool {
         }
 
         LOG.info("Loaded {} backup jobs from {}", jobs.size(), jobsFile);
+        return processJobs(jobs, dbUrl, dbUser, dbPass, props);
+    }
+
+    private int processJobs(List<BackupJob> jobs, String dbUrl, String dbUser,
+                             String dbPass, Properties props) throws Exception {
         for (int i = 0; i < jobs.size(); i++) {
             LOG.info("  Job {}: {}", i + 1, jobs.get(i));
         }
@@ -160,7 +183,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
             List<BackupJob> stillPending = new ArrayList<>();
 
             for (BackupJob job : pending) {
-                LOG.info("--- Trying job: pid={} lockName={} ---", job.getPid(), job.getLockName());
+                LOG.info("--- Trying job: pid={} lockName={} src={} ---",
+                        job.getPid(), job.getLockName(), job.getSrc());
 
                 WorkflowLock lock = new WorkflowLock(
                         dbUrl, dbUser, dbPass,
@@ -179,10 +203,12 @@ public class HdfsCifsCopy extends Configured implements Tool {
                             job.getBuffer(), job.isChecksum());
                     if (rc == 0) {
                         totalCompleted++;
-                        LOG.info("--- Job completed: pid={} ---", job.getPid());
+                        LOG.info("--- Job completed: pid={} src={} ---",
+                                job.getPid(), job.getSrc());
                     } else {
                         failed.add(job);
-                        LOG.error("--- Job finished with errors: pid={} ---", job.getPid());
+                        LOG.error("--- Job finished with errors: pid={} src={} ---",
+                                job.getPid(), job.getSrc());
                     }
                 } catch (Exception e) {
                     failed.add(job);
@@ -272,6 +298,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 + " [--threads N] [--retries N] [--buffer N] [--no-checksum]"
                 + " [--lock-name <CFF1|CFF2>]");
         System.err.println("  Multi job:   hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --jobs <file.json>");
+        System.err.println("  Dynamic:     hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --dynamic");
     }
 
     public static void main(String[] args) throws Exception {
