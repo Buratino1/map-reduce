@@ -50,7 +50,8 @@ public class DynamicJobLoader {
                     jobs.add(cffv2MainJob(pid));
                     cffv2Count++;
                 } else {
-                    jobs.add(cffv1MainJob(pid));
+                    jobs.add(cffv1MainJob(pid, "db_mv"));
+                    jobs.add(cffv1MainJob(pid, "db_lv"));
                     cffv1Count++;
                 }
                 jobs.add(clientsJob(pid));
@@ -70,11 +71,11 @@ public class DynamicJobLoader {
                 400, false);
     }
 
-    private BackupJob cffv1MainJob(String pid) {
+    private BackupJob cffv1MainJob(String pid, String folder) {
         return new BackupJob(
                 pid, "CFF1",
-                "/user/catalyst/v2.systems.prod/" + pid + "/db_mv",
-                DST_ROOT + "/CFF1/" + pid + "/db_mv",
+                "/user/catalyst/v2.systems.prod/" + pid + "/" + folder,
+                DST_ROOT + "/CFF1/" + pid + "/" + folder,
                 200, true);
     }
 
