@@ -74,7 +74,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/db_mv",
-                DST_ROOT + "/CFF1/" + pid,
+                DST_ROOT + "/CFF1/" + pid + "/db_mv",
                 200, true);
     }
 
@@ -82,7 +82,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/v2.systems.prod/" + pid + "/clients",
-                DST_ROOT + "/clients/" + pid,
+                DST_ROOT + "/clients/" + pid + "/clients",
                 100, true);
     }
 
@@ -90,7 +90,7 @@ public class DynamicJobLoader {
         return new BackupJob(
                 pid, "CFF1",
                 "/user/catalyst/impala.prod/" + pid + "/ext",
-                DST_ROOT + "/ext/" + pid,
+                DST_ROOT + "/ext/" + pid + "/ext",
                 200, false);
     }
 

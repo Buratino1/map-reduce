@@ -33,7 +33,9 @@ public class HdfsCifsCopy extends Configured implements Tool {
     private static final int DEFAULT_RETRIES = 3;
     private static final int DEFAULT_BUFFER = 1048576;
     private static final long JOBS_RETRY_INTERVAL_MS = 2 * 60 * 1000L;
-    private static final String RESTORE_PREFIX = "/restored";
+    private static final String DEFAULT_RESTORE_PREFIX = "/restored";
+
+    private String restorePrefix = DEFAULT_RESTORE_PREFIX;
 
     @Override
     public int run(String[] args) throws Exception {
@@ -85,7 +87,12 @@ public class HdfsCifsCopy extends Configured implements Tool {
             }
         }
 
+        restorePrefix = props.getProperty("restore.prefix", DEFAULT_RESTORE_PREFIX);
+
         LOG.info("Mode     : {}", restore ? "RESTORE (local -> HDFS)" : "BACKUP (HDFS -> local)");
+        if (restore) {
+            LOG.info("Restore prefix: {}", restorePrefix);
+        }
         if (onlyPids != null) {
             LOG.info("Only PIDs: {}", onlyPids);
         }
@@ -138,7 +145,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         String actualDst = dst;
         if (restore) {
             actualSrc = dst;
-            actualDst = RESTORE_PREFIX + src;
+            actualDst = restorePrefix + src;
         }
 
         boolean useLock = dbUrl != null && !restore;
@@ -215,7 +222,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         List<BackupJob> restored = new ArrayList<>();
         for (BackupJob j : jobs) {
             String newSrc = j.getDst();
-            String newDst = RESTORE_PREFIX + j.getSrc();
+            String newDst = restorePrefix + j.getSrc();
             restored.add(new BackupJob(
                     j.getPid(), j.getLockName(),
                     newSrc, newDst,
