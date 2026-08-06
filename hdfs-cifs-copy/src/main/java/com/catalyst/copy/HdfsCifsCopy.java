@@ -117,7 +117,13 @@ public class HdfsCifsCopy extends Configured implements Tool {
             return 1;
         }
         LOG.info("Loading jobs dynamically from DB...");
-        DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass);
+        List<String> extraExtIds = new ArrayList<>();
+        String extExtra = props.getProperty("ext.extra", "");
+        for (String id : extExtra.split(",")) {
+            id = id.trim();
+            if (!id.isEmpty()) extraExtIds.add(id);
+        }
+        DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass, extraExtIds);
         List<BackupJob> jobs = loader.load();
         jobs = filterByPid(jobs, onlyPids);
         if (restore) jobs = transformForRestore(jobs);

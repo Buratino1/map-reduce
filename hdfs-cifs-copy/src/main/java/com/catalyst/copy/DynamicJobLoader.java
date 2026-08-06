@@ -28,11 +28,14 @@ public class DynamicJobLoader {
     private final String dbUrl;
     private final String dbUser;
     private final String dbPass;
+    private final List<String> extraExtIds;
 
-    public DynamicJobLoader(String dbUrl, String dbUser, String dbPass) {
+    public DynamicJobLoader(String dbUrl, String dbUser, String dbPass,
+                             List<String> extraExtIds) {
         this.dbUrl = dbUrl;
         this.dbUser = dbUser;
         this.dbPass = dbPass;
+        this.extraExtIds = extraExtIds;
     }
 
     public List<BackupJob> load() throws SQLException {
@@ -58,8 +61,12 @@ public class DynamicJobLoader {
                 jobs.add(extJob(pid));
             }
         }
-        LOG.info("Loaded {} jobs from DB: {} cffv1 systems, {} cffv2 systems",
-                jobs.size(), cffv1Count, cffv2Count);
+        for (String id : extraExtIds) {
+            jobs.add(extJob(id));
+        }
+
+        LOG.info("Loaded {} jobs: {} cffv1 systems, {} cffv2 systems, {} extra ext ids",
+                jobs.size(), cffv1Count, cffv2Count, extraExtIds.size());
         return jobs;
     }
 
