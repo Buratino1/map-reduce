@@ -23,6 +23,7 @@ public class BackupJob {
     }
 
     public String getPid()       { return pid; }
+    public void setPid(String p) { this.pid = p; }
     public String getLockName()  { return lockName; }
     public String getSrc()       { return src; }
     public String getDst()       { return dst; }

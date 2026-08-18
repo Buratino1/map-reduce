@@ -56,6 +56,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         boolean dynamic = false;
         boolean restore = false;
         Set<String> onlyPids = null;
+        String configFile = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -73,6 +74,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
                 case "--jobs":        jobsFile = args[++i]; break;
                 case "--dynamic":     dynamic  = true; break;
                 case "--restore":     restore  = true; break;
+                case "--config":      configFile = args[++i]; break;
                 case "--only-pid":
                     if (onlyPids == null) onlyPids = new HashSet<>();
                     for (String p : args[++i].split(",")) {
@@ -98,7 +100,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
         }
 
         if (dynamic) {
-            return runDynamicJobs(dbUrl, dbUser, dbPass, props, restore, onlyPids);
+            return runDynamicJobs(dbUrl, dbUser, dbPass, props, restore, onlyPids, configFile);
         }
 
         if (jobsFile != null) {
@@ -110,8 +112,8 @@ public class HdfsCifsCopy extends Configured implements Tool {
     }
 
     private int runDynamicJobs(String dbUrl, String dbUser, String dbPass,
-                                Properties props, boolean restore, Set<String> onlyPids)
-            throws Exception {
+                                Properties props, boolean restore, Set<String> onlyPids,
+                                String configFile) throws Exception {
         if (dbUrl == null) {
             System.err.println("Error: DB connection required for --dynamic mode");
             return 1;
@@ -123,7 +125,18 @@ public class HdfsCifsCopy extends Configured implements Tool {
             id = id.trim();
             if (!id.isEmpty()) extraExtIds.add(id);
         }
-        DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass, extraExtIds);
+
+        DynamicConfig config = null;
+        if (configFile != null) {
+            try (InputStreamReader reader = new InputStreamReader(
+                    new FileInputStream(configFile), StandardCharsets.UTF_8)) {
+                config = new Gson().fromJson(reader, DynamicConfig.class);
+            }
+            LOG.info("Loaded config from {}: {} type overrides, {} extra jobs",
+                    configFile, config.getTypes().size(), config.getExtraJobs().size());
+        }
+
+        DynamicJobLoader loader = new DynamicJobLoader(dbUrl, dbUser, dbPass, extraExtIds, config);
         List<BackupJob> jobs = loader.load();
         jobs = filterByPid(jobs, onlyPids);
         if (restore) jobs = transformForRestore(jobs);
@@ -378,13 +391,15 @@ public class HdfsCifsCopy extends Configured implements Tool {
         System.err.println("  Multi job:   hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --jobs <file.json>"
                 + " [--restore] [--only-pid <id1,id2,...>]");
         System.err.println("  Dynamic:     hadoop jar hdfs-cifs-copy-1.0.0-fat.jar --dynamic"
-                + " [--restore] [--only-pid <id1,id2,...>]");
+                + " [--restore] [--only-pid <id1,id2,...>] [--config <config.json>]");
         System.err.println();
         System.err.println("  --restore   reverses copy direction: reads from local dst,");
         System.err.println("              writes to HDFS at /restored + original src path");
         System.err.println("  --only-pid  process only listed production IDs;");
         System.err.println("              accepts comma-separated (--only-pid 7001,2020) or");
         System.err.println("              repeated (--only-pid 7001 --only-pid 2020)");
+        System.err.println("  --config    JSON with 'types' (pid -> CFF1|CFF2 override) and");
+        System.err.println("              'extraJobs' (additional folders in --jobs format)");
     }
 
     public static void main(String[] args) throws Exception {

@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class DynamicJobLoader {
 
@@ -29,13 +30,15 @@ public class DynamicJobLoader {
     private final String dbUser;
     private final String dbPass;
     private final List<String> extraExtIds;
+    private final DynamicConfig config;
 
     public DynamicJobLoader(String dbUrl, String dbUser, String dbPass,
-                             List<String> extraExtIds) {
+                             List<String> extraExtIds, DynamicConfig config) {
         this.dbUrl = dbUrl;
         this.dbUser = dbUser;
         this.dbPass = dbPass;
         this.extraExtIds = extraExtIds;
+        this.config = config != null ? config : new DynamicConfig();
     }
 
     public List<BackupJob> load() throws SQLException {
@@ -43,12 +46,24 @@ public class DynamicJobLoader {
         int cffv1Count = 0;
         int cffv2Count = 0;
 
+        Map<String, String> typeOverrides = config.getTypes();
+
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(QUERY);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 String pid = rs.getString("productionId");
                 String type = rs.getString("type");
+
+                String override = typeOverrides.get(pid);
+                if (override != null) {
+                    String normalized = "CFF2".equalsIgnoreCase(override) ? "cffv2" : "cffv1";
+                    if (!normalized.equals(type)) {
+                        LOG.info("Type override for pid {}: {} -> {}", pid, type, normalized);
+                    }
+                    type = normalized;
+                }
+
                 if ("cffv2".equals(type)) {
                     jobs.add(cffv2MainJob(pid));
                     cffv2Count++;
@@ -65,9 +80,24 @@ public class DynamicJobLoader {
             jobs.add(extJob(id));
         }
 
-        LOG.info("Loaded {} jobs: {} cffv1 systems, {} cffv2 systems, {} extra ext ids",
-                jobs.size(), cffv1Count, cffv2Count, extraExtIds.size());
+        List<BackupJob> extraJobs = config.getExtraJobs();
+        for (BackupJob job : extraJobs) {
+            if (job.getPid() == null || job.getPid().isEmpty()) {
+                job.setPid(lastPathSegment(job.getSrc()));
+            }
+            jobs.add(job);
+        }
+
+        LOG.info("Loaded {} jobs: {} cffv1 systems, {} cffv2 systems, {} extra ext ids, {} extra jobs",
+                jobs.size(), cffv1Count, cffv2Count, extraExtIds.size(), extraJobs.size());
         return jobs;
+    }
+
+    private static String lastPathSegment(String path) {
+        if (path == null) return "unknown";
+        String trimmed = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        int idx = trimmed.lastIndexOf('/');
+        return idx >= 0 ? trimmed.substring(idx + 1) : trimmed;
     }
 
     private BackupJob cffv2MainJob(String pid) {
