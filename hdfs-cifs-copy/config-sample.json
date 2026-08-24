@@ -4,8 +4,8 @@
     "2020": "CFF1"
   },
   "extraJobs": [
-    { "lockName": "CFF1", "threads": 200, "src": "/user/hive/pam/FI", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/FI", "checksum": false },
-    { "lockName": "CFF1", "threads": 200, "src": "/user/hive/pam/IT", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/IT", "checksum": false },
-    { "lockName": "CFF1", "threads": 200, "src": "/user/hive/pam/SE", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/SE", "checksum": false }
+    { "threads": 200, "src": "/user/hive/pam/FI", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/FI", "checksum": false },
+    { "threads": 200, "src": "/user/hive/pam/IT", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/IT", "checksum": false },
+    { "threads": 200, "src": "/user/hive/pam/SE", "dst": "/mnt/hadoop-backup/catalyst_hdfs_backup/hive/pam/SE", "checksum": false }
   ]
 }

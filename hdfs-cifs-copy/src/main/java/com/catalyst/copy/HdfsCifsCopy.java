@@ -272,7 +272,7 @@ public class HdfsCifsCopy extends Configured implements Tool {
                         job.getPid(), job.getLockName(), job.getSrc());
 
                 WorkflowLock lock = null;
-                if (!restore) {
+                if (!restore && job.getLockName() != null && !job.getLockName().isEmpty()) {
                     lock = new WorkflowLock(
                             dbUrl, dbUser, dbPass,
                             job.getLockName(), job.getPid(), lockWorkflow, lockType);
