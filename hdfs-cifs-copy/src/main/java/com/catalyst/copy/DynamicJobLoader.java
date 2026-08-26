@@ -85,6 +85,7 @@ public class DynamicJobLoader {
             if (job.getPid() == null || job.getPid().isEmpty()) {
                 job.setPid(lastPathSegment(job.getSrc()));
             }
+            job.setLockName(null);
             jobs.add(job);
         }
 
